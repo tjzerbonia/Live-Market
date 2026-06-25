@@ -36,6 +36,7 @@ function showAdmin() {
   document.getElementById("auth-overlay").classList.add("hidden");
   document.getElementById("admin-ui").classList.remove("hidden");
   subscribeToMarkets();
+  subscribeToPlayers();
 }
 
 if (checkSession()) {
@@ -283,11 +284,51 @@ function resetForm() {
   updateProbSum();
 }
 
-// ─── RESET BALANCES ───────────────────────────────────────────
-window.resetBalances = async function() {
-  if (!confirm("Reset ALL player balances to $1,000? Players will be updated on their next page load.")) return;
+// ─── PLAYERS ──────────────────────────────────────────────────
+function subscribeToPlayers() {
+  onValue(ref(db, "users"), (snap) => {
+    const data = snap.val() || {};
+    const container = document.getElementById("admin-player-list");
+    const players = Object.entries(data).sort((a, b) => (b[1].lastSeen || 0) - (a[1].lastSeen || 0));
+
+    if (players.length === 0) {
+      container.innerHTML = `<div class="list-empty">No players yet.</div>`;
+      return;
+    }
+
+    container.innerHTML = players.map(([id, p]) => {
+      const bal = p.balance ?? 1000;
+      const balClass = bal < 0 ? "negative" : "positive";
+      const seen = p.lastSeen ? timeAgo(p.lastSeen) : "never";
+      return `
+        <div class="admin-player-row">
+          <div class="player-name">${p.name || "Unknown"}</div>
+          <div class="player-balance ${balClass}">$${bal.toLocaleString()}</div>
+          <div class="player-seen">active ${seen}</div>
+          <button class="player-reset-btn" onclick="resetUser('${id}')">Reset to $1,000</button>
+        </div>`;
+    }).join("");
+  });
+}
+
+function timeAgo(ts) {
+  if (!ts) return "never";
+  const diff = Math.floor((Date.now() - ts) / 1000);
+  if (diff < 60) return `${diff}s ago`;
+  if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
+  if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
+  return `${Math.floor(diff / 86400)}d ago`;
+}
+
+window.resetUser = async function(userId) {
+  await set(ref(db, `config/user_resets/${userId}`), Date.now());
+  showToast("Balance reset sent.");
+};
+
+window.resetAllBalances = async function() {
+  if (!confirm("Reset ALL player balances to $1,000?")) return;
   await set(ref(db, "config/balance_reset_at"), Date.now());
-  showToast("Balances reset.");
+  showToast("All balances reset.");
 };
 
 // ─── STATUS / DELETE ──────────────────────────────────────────

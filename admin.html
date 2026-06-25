@@ -91,18 +91,6 @@
           </div>
         </section>
 
-        <!-- Danger zone -->
-        <div class="admin-danger-section">
-          <h3>Danger Zone</h3>
-          <div class="danger-row">
-            <div>
-              <div class="danger-label">Reset all balances</div>
-              <div class="danger-desc">Restores every player to $1,000 on their next page load.</div>
-            </div>
-            <button class="danger-btn" onclick="resetBalances()">Reset Balances</button>
-          </div>
-        </div>
-
         <!-- Market list -->
         <section class="admin-list-section">
           <div class="list-header">
@@ -119,6 +107,18 @@
         </section>
 
       </div>
+
+      <!-- Players section (full width) -->
+      <section class="admin-players-section">
+        <div class="list-header">
+          <h2>Players</h2>
+          <button class="danger-btn" onclick="resetAllBalances()">Reset All to $1,000</button>
+        </div>
+        <div id="admin-player-list">
+          <div class="list-empty">No players yet.</div>
+        </div>
+      </section>
+
     </main>
 
   </div>

@@ -98,6 +98,66 @@
 }
 .danger-btn:hover { background: var(--no-dim); }
 
+/* === Players section === */
+.admin-players-section {
+  margin-top: 2rem;
+}
+
+.admin-players-section h2 {
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.admin-player-row {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 0.75rem 1.25rem;
+  margin-bottom: 0.5rem;
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.player-name {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--text);
+  flex: 1;
+}
+
+.player-balance {
+  font-size: 0.875rem;
+  font-weight: 700;
+  min-width: 80px;
+  text-align: right;
+}
+
+.player-balance.positive { color: var(--yes); }
+.player-balance.negative { color: var(--no); }
+
+.player-seen {
+  font-size: 0.75rem;
+  color: var(--text-dim);
+  min-width: 80px;
+  text-align: right;
+}
+
+.player-reset-btn {
+  background: none;
+  border: 1px solid rgba(229,57,53,0.3);
+  border-radius: var(--radius-sm);
+  color: var(--no);
+  font-size: 0.72rem;
+  font-weight: 600;
+  padding: 0.25rem 0.6rem;
+  cursor: pointer;
+  transition: all 0.15s;
+  white-space: nowrap;
+}
+.player-reset-btn:hover { background: var(--no-dim); }
+
 /* === Admin layout === */
 .admin-layout {
   display: grid;

@@ -57,11 +57,20 @@ function submitNickname() {
 function onUserReady() {
   document.getElementById("user-name-display").textContent = user.name;
   updateBalanceDisplay();
+  registerUserInFirebase();
   subscribeToMarkets();
   subscribeToActivity();
   subscribeToMarketProbs();
   subscribeToMarketHistories();
   subscribeToConfig();
+}
+
+function registerUserInFirebase() {
+  update(ref(db, `users/${user.id}`), {
+    name: user.name,
+    balance: user.balance,
+    lastSeen: Date.now(),
+  });
 }
 
 // ─── UI HELPERS ──────────────────────────────────────────────
@@ -197,19 +206,22 @@ function renderSparkline(history, options, probs) {
     <div class="market-sparkline"><svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none">${paths.join("")}</svg></div>`;
 }
 
-// ─── CONFIG (balance reset signal) ───────────────────────────
+// ─── CONFIG (balance reset signals) ──────────────────────────
 function subscribeToConfig() {
-  onValue(ref(db, "config/balance_reset_at"), (snap) => {
-    const resetAt = snap.val();
-    if (!resetAt) return;
-    if (resetAt > (user.lastResetAt || 0)) {
-      user.balance = 1000;
-      user.lastResetAt = resetAt;
-      localStorage.setItem("forecast_user", JSON.stringify(user));
-      updateBalanceDisplay();
-      showToast("Your balance has been reset to $1,000.");
-    }
-  });
+  const handleReset = (resetAt) => {
+    if (!resetAt || resetAt <= (user.lastResetAt || 0)) return;
+    user.balance = 1000;
+    user.lastResetAt = resetAt;
+    localStorage.setItem("forecast_user", JSON.stringify(user));
+    updateBalanceDisplay();
+    update(ref(db, `users/${user.id}`), { balance: 1000 });
+    showToast("Your balance has been reset to $1,000.");
+  };
+
+  // Global reset
+  onValue(ref(db, "config/balance_reset_at"), (snap) => handleReset(snap.val()));
+  // Per-user reset
+  onValue(ref(db, `config/user_resets/${user.id}`), (snap) => handleReset(snap.val()));
 }
 
 // ─── FIREBASE SUBSCRIPTIONS ──────────────────────────────────
@@ -438,6 +450,7 @@ window.submitBet = async function() {
   user.balance = Math.max(-1000, user.balance - activeBet.amount);
   localStorage.setItem("forecast_user", JSON.stringify(user));
   updateBalanceDisplay();
+  update(ref(db, `users/${user.id}`), { balance: user.balance, lastSeen: Date.now() });
 
   // Update volume
   await update(ref(db, `markets/${activeBet.marketId}`), {
