@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Forecast — Admin</title>
+  <link rel="stylesheet" href="style.css" />
+  <link rel="stylesheet" href="admin.css" />
+</head>
+<body>
+
+  <!-- Password gate -->
+  <div id="auth-overlay" class="overlay">
+    <div class="modal">
+      <div class="modal-logo">
+        <img src="kalshi_800.png" alt="Kalshi" />
+      </div>
+      <h2>Admin Access</h2>
+      <p>Enter your admin password to manage markets.</p>
+      <input type="password" id="password-input" placeholder="Password" autocomplete="off" />
+      <div id="auth-error" class="auth-error hidden">Incorrect password.</div>
+      <button id="password-submit">Enter Admin</button>
+      <a href="index.html" class="back-link">Back to markets</a>
+    </div>
+  </div>
+
+  <!-- Admin UI (hidden until authenticated) -->
+  <div id="admin-ui" class="hidden">
+
+    <header>
+      <div class="header-inner">
+        <div class="logo">
+          <img src="kalshi_800.png" alt="Kalshi" />
+          <span class="admin-badge">Admin</span>
+        </div>
+        <div class="header-right">
+          <a href="index.html" class="back-to-site">View site</a>
+          <button id="logout-btn" class="logout-btn">Log out</button>
+        </div>
+      </div>
+    </header>
+
+    <main>
+      <div class="admin-layout">
+
+        <!-- Create / Edit form -->
+        <section class="admin-form-section">
+          <h2 id="form-heading">New Market</h2>
+          <input type="hidden" id="edit-market-id" />
+
+          <div class="form-group">
+            <label>Title</label>
+            <input type="text" id="f-title" placeholder="Will the Bears make the playoffs?" maxlength="160" />
+          </div>
+
+          <div class="form-row">
+            <div class="form-group">
+              <label>Category</label>
+              <input type="text" id="f-category" placeholder="NFL" maxlength="30" />
+            </div>
+            <div class="form-group">
+              <label>Close date <span class="label-hint">(optional)</span></label>
+              <input type="date" id="f-closedate" />
+            </div>
+          </div>
+
+          <!-- Options -->
+          <div class="form-group">
+            <label>Options <span class="label-hint">(2–5, must sum to 100%)</span></label>
+            <div id="options-list">
+              <div class="option-row" data-index="0">
+                <input type="text" class="opt-name" placeholder="Option name" value="YES" maxlength="40" />
+                <input type="number" class="opt-prob" placeholder="%" min="1" max="98" value="50" />
+                <span></span>
+              </div>
+              <div class="option-row" data-index="1">
+                <input type="text" class="opt-name" placeholder="Option name" value="NO" maxlength="40" />
+                <input type="number" class="opt-prob" placeholder="%" min="1" max="98" value="50" />
+                <span></span>
+              </div>
+            </div>
+            <div class="option-actions">
+              <button type="button" class="option-add-btn" id="option-add-btn" onclick="addOption()">+ Add option</button>
+              <span class="prob-sum-display" id="prob-sum-display">Sum: 100%</span>
+            </div>
+          </div>
+
+          <div class="form-actions">
+            <button id="save-market-btn" onclick="saveMarket()">Create Market</button>
+            <button id="cancel-edit-btn" class="secondary hidden" onclick="cancelEdit()">Cancel</button>
+          </div>
+        </section>
+
+        <!-- Market list -->
+        <section class="admin-list-section">
+          <div class="list-header">
+            <h2>All Markets</h2>
+            <div class="status-tabs">
+              <button class="tab-btn active" onclick="filterMarkets('open')">Open</button>
+              <button class="tab-btn" onclick="filterMarkets('closed')">Closed</button>
+              <button class="tab-btn" onclick="filterMarkets('all')">All</button>
+            </div>
+          </div>
+          <div id="admin-market-list">
+            <div class="list-empty">No markets yet. Create one.</div>
+          </div>
+        </section>
+
+      </div>
+    </main>
+
+  </div>
+
+  <script type="module" src="admin.js"></script>
+</body>
+</html>

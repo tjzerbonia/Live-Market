@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Forecast Markets</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+
+  <!-- Nickname modal -->
+  <div id="nickname-overlay" class="overlay hidden">
+    <div class="modal">
+      <div class="modal-logo">
+        <img src="kalshi_800.png" alt="Kalshi" />
+      </div>
+      <h2>Welcome to Forecast</h2>
+      <p>Pick a display name to start trading. No account needed.</p>
+      <input type="text" id="nickname-input" placeholder="Your display name" maxlength="24" autocomplete="off" />
+      <button id="nickname-submit">Enter Markets</button>
+    </div>
+  </div>
+
+  <!-- Header -->
+  <header>
+    <div class="header-inner">
+      <div class="logo">
+        <img src="kalshi_800.png" alt="Kalshi" />
+      </div>
+      <div class="header-right">
+        <div class="balance-pill">
+          <span class="balance-label">Balance</span>
+          <span class="balance-amount" id="user-balance">$1,000</span>
+        </div>
+        <div class="user-pill" id="user-display">
+          <span id="user-name-display">—</span>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <!-- Main content -->
+  <main>
+    <div class="page-header">
+      <div>
+        <h1>Markets</h1>
+        <p class="subtitle">Real-money feel, no real stakes. Trade your free balance.</p>
+      </div>
+      <div class="live-badge">
+        <span class="live-dot"></span> Live
+      </div>
+    </div>
+
+    <div class="markets-grid" id="markets-grid">
+      <!-- Markets injected by JS -->
+    </div>
+
+    <section class="activity-section">
+      <h2>Recent Trades</h2>
+      <div class="activity-feed" id="activity-feed">
+        <div class="activity-empty">No trades yet. Be the first!</div>
+      </div>
+    </section>
+  </main>
+
+  <!-- Bet modal -->
+  <div id="bet-overlay" class="overlay hidden">
+    <div class="modal bet-modal">
+      <button class="modal-close" id="bet-close">&#x2715;</button>
+      <div class="bet-modal-market" id="bet-modal-market-title"></div>
+      <div class="bet-options-row" id="bet-options-row">
+        <!-- Populated by JS -->
+      </div>
+      <div class="bet-odds-display" id="bet-odds-display"></div>
+      <div class="bet-amount-row">
+        <label>Amount</label>
+        <div class="amount-controls">
+          <button onclick="adjustAmount(-10)">-$10</button>
+          <span id="bet-amount-display">$10</span>
+          <button onclick="adjustAmount(10)">+$10</button>
+        </div>
+        <div class="quick-amounts">
+          <button onclick="setAmount(10)">$10</button>
+          <button onclick="setAmount(25)">$25</button>
+          <button onclick="setAmount(50)">$50</button>
+          <button onclick="setAmount(100)">$100</button>
+        </div>
+      </div>
+      <div class="bet-payout-row">
+        <span>Potential payout</span>
+        <span class="payout-amount" id="payout-amount">$19</span>
+      </div>
+      <button class="submit-bet-btn" id="submit-bet-btn" onclick="submitBet()">Place Trade</button>
+    </div>
+  </div>
+
+  <script type="module" src="app.js"></script>
+</body>
+</html>
