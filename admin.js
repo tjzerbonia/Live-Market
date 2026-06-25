@@ -283,6 +283,13 @@ function resetForm() {
   updateProbSum();
 }
 
+// ─── RESET BALANCES ───────────────────────────────────────────
+window.resetBalances = async function() {
+  if (!confirm("Reset ALL player balances to $1,000? Players will be updated on their next page load.")) return;
+  await set(ref(db, "config/balance_reset_at"), Date.now());
+  showToast("Balances reset.");
+};
+
 // ─── STATUS / DELETE ──────────────────────────────────────────
 window.setStatus = async function(id, status) {
   await update(ref(db, `markets/${id}`), { status });

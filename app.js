@@ -61,11 +61,14 @@ function onUserReady() {
   subscribeToActivity();
   subscribeToMarketProbs();
   subscribeToMarketHistories();
+  subscribeToConfig();
 }
 
 // ─── UI HELPERS ──────────────────────────────────────────────
 function updateBalanceDisplay() {
-  document.getElementById("user-balance").textContent = `$${user.balance.toLocaleString()}`;
+  const el = document.getElementById("user-balance");
+  el.textContent = `$${user.balance.toLocaleString()}`;
+  el.style.color = user.balance < 0 ? "var(--no)" : "";
 }
 
 function showToast(msg) {
@@ -192,6 +195,21 @@ function renderSparkline(history, options, probs) {
 
   return `<div class="market-chart-legend">${legend}</div>
     <div class="market-sparkline"><svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none">${paths.join("")}</svg></div>`;
+}
+
+// ─── CONFIG (balance reset signal) ───────────────────────────
+function subscribeToConfig() {
+  onValue(ref(db, "config/balance_reset_at"), (snap) => {
+    const resetAt = snap.val();
+    if (!resetAt) return;
+    if (resetAt > (user.lastResetAt || 0)) {
+      user.balance = 1000;
+      user.lastResetAt = resetAt;
+      localStorage.setItem("forecast_user", JSON.stringify(user));
+      updateBalanceDisplay();
+      showToast("Your balance has been reset to $1,000.");
+    }
+  });
 }
 
 // ─── FIREBASE SUBSCRIPTIONS ──────────────────────────────────
@@ -384,12 +402,14 @@ window.selectOption = function(i) {
 };
 
 window.adjustAmount = function(delta) {
-  activeBet.amount = Math.max(1, Math.min(user.balance, activeBet.amount + delta));
+  const maxBet = user.balance + 1000; // can go to -$1,000
+  activeBet.amount = Math.max(1, Math.min(maxBet, activeBet.amount + delta));
   updateBetModal();
 };
 
 window.setAmount = function(amount) {
-  activeBet.amount = Math.min(user.balance, amount);
+  const maxBet = user.balance + 1000;
+  activeBet.amount = Math.min(maxBet, amount);
   updateBetModal();
 };
 
@@ -415,7 +435,7 @@ window.submitBet = async function() {
   const optionLabel = options[activeBet.optionIndex];
   const payout      = Math.round(activeBet.amount / (optionProb / 100));
 
-  user.balance = Math.max(0, user.balance - activeBet.amount);
+  user.balance = Math.max(-1000, user.balance - activeBet.amount);
   localStorage.setItem("forecast_user", JSON.stringify(user));
   updateBalanceDisplay();
 

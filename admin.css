@@ -51,6 +51,53 @@
 }
 .auth-error.hidden { display: none; }
 
+/* === Danger Zone === */
+.admin-danger-section {
+  border: 1px solid rgba(229,57,53,0.2);
+  border-radius: var(--radius);
+  padding: 1rem 1.25rem;
+  background: rgba(229,57,53,0.03);
+  margin-bottom: 1.5rem;
+}
+.admin-danger-section h3 {
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: var(--no);
+  margin-bottom: 0.75rem;
+}
+.danger-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+.danger-label {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--text);
+}
+.danger-desc {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  margin-top: 0.15rem;
+}
+.danger-btn {
+  background: none;
+  border: 1px solid rgba(229,57,53,0.35);
+  border-radius: var(--radius-sm);
+  color: var(--no);
+  font-size: 0.8rem;
+  font-weight: 600;
+  padding: 0.4rem 0.875rem;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.15s;
+  flex-shrink: 0;
+}
+.danger-btn:hover { background: var(--no-dim); }
+
 /* === Admin layout === */
 .admin-layout {
   display: grid;
