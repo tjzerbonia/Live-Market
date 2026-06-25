@@ -368,7 +368,7 @@ main {
 }
 
 /* === Bet Modal === */
-.bet-modal { max-width: 380px; }
+.bet-modal { max-width: 580px; }
 
 .modal-close {
   position: absolute; top: 1rem; right: 1rem;
@@ -378,13 +378,42 @@ main {
 }
 .modal-close:hover { color: var(--text); }
 
+.bet-modal-category {
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--accent);
+}
+
 .bet-modal-market {
-  font-size: 0.95rem;
-  font-weight: 600;
+  font-size: 1.05rem;
+  font-weight: 700;
   color: var(--text);
   line-height: 1.4;
-  padding-bottom: 0.5rem;
-  border-bottom: 1px solid var(--border);
+  margin-bottom: 0.25rem;
+}
+
+.modal-chart-area {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 0.875rem 1rem 0.5rem;
+  background: var(--bg);
+  margin-bottom: 0.25rem;
+}
+
+.modal-chart-area .market-chart-legend {
+  margin-bottom: 0.6rem;
+}
+
+.modal-chart-svg {
+  height: 140px;
+  overflow: hidden;
+}
+.modal-chart-svg svg {
+  width: 100%;
+  height: 140px;
+  display: block;
 }
 
 .bet-options-row {
@@ -557,6 +586,10 @@ main {
   border-radius: 4px;
   background: var(--yes-dim);
   color: var(--yes);
+}
+.activity-side.no {
+  background: var(--no-dim);
+  color: var(--no);
 }
 .activity-amount {
   font-weight: 600;
