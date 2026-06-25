@@ -266,6 +266,58 @@ function renderMarkets() {
   }).join("");
 }
 
+// ─── MODAL CHART ─────────────────────────────────────────────
+function renderModalChart(history, options, probs) {
+  const W = 400, H = 140, PAD = 6;
+  // Show ALL options in the expanded modal (including NO for binary)
+  const n = Math.min(options.length, OPTION_COLORS.length);
+
+  const legend = options.slice(0, n).map((opt, i) => {
+    const p = Math.round(probs[i] || 0);
+    return `<div class="market-chart-legend-row">
+      <div class="legend-dot" style="background:${OPTION_COLORS[i]}"></div>
+      <div class="legend-label">${opt}</div>
+      <div class="legend-prob">${p}%</div>
+    </div>`;
+  }).join('');
+
+  if (!history || history.length < 2) {
+    return `<div class="market-chart-legend">${legend}</div>
+      <div class="modal-chart-svg"><svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none">
+        <line x1="0" y1="${H/2}" x2="${W}" y2="${H/2}" stroke="#e5e7eb" stroke-width="1.5"/>
+      </svg></div>`;
+  }
+
+  const allVals = history.flatMap(snap =>
+    Array.isArray(snap) ? snap.slice(0, n) : [snap]
+  );
+  const minP = Math.max(0,   Math.min(...allVals) - 5);
+  const maxP = Math.min(100, Math.max(...allVals) + 5);
+  const range = maxP - minP || 1;
+
+  const toXY = (snap, i, oi) => {
+    const x = PAD + (i / (history.length - 1)) * (W - 2 * PAD);
+    const prob = Array.isArray(snap) ? (snap[oi] ?? 0) : snap;
+    const y = H - PAD - ((prob - minP) / range) * (H - 2 * PAD);
+    return [parseFloat(x.toFixed(1)), parseFloat(y.toFixed(1))];
+  };
+
+  const paths = [];
+  for (let oi = 0; oi < n; oi++) {
+    const color = OPTION_COLORS[oi];
+    const pts = history.map((snap, i) => toXY(snap, i, oi));
+    const d = stepPath(pts);
+    const [ex, ey] = pts[pts.length - 1];
+    paths.push(
+      `<path d="${d}" fill="none" stroke="${color}" stroke-width="2" stroke-linecap="square"/>`,
+      `<circle cx="${ex}" cy="${ey}" r="4" fill="${color}"/>`
+    );
+  }
+
+  return `<div class="market-chart-legend">${legend}</div>
+    <div class="modal-chart-svg"><svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none">${paths.join('')}</svg></div>`;
+}
+
 // ─── BET MODAL ───────────────────────────────────────────────
 window.openBetModal = function(marketId, optionIndex = 0) {
   if (!user.id) return;
@@ -276,7 +328,13 @@ window.openBetModal = function(marketId, optionIndex = 0) {
   activeBet.optionIndex = optionIndex;
   activeBet.amount = 10;
 
+  const options = market.options || ["YES", "NO"];
+  const probs   = getCurrentProbs(marketId, market);
+  const history = getHistory(marketId, market);
+
+  document.getElementById("bet-modal-category").textContent = market.category || "";
   document.getElementById("bet-modal-market-title").textContent = market.title;
+  document.getElementById("modal-chart-area").innerHTML = renderModalChart(history, options, probs);
   document.getElementById("bet-overlay").classList.remove("hidden");
   updateBetModal();
 };
@@ -403,7 +461,7 @@ function subscribeToActivity() {
           <strong>${bet.userName || "Anonymous"}</strong>
           bet on <strong>${(bet.marketTitle || "a market").slice(0, 45)}${(bet.marketTitle?.length || 0) > 45 ? "…" : ""}</strong>
         </div>
-        <div class="activity-side">${bet.option || bet.side || "YES"}</div>
+        <div class="activity-side${(bet.option === 'NO' || bet.side === 'NO') ? ' no' : ''}">${bet.option || bet.side || "YES"}</div>
         <div class="activity-amount">$${bet.amount}</div>
         <div class="activity-time">${timeAgo(bet.timestamp)}</div>
       </div>`).join("");
