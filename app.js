@@ -89,7 +89,7 @@ function timeAgo(ts) {
 }
 
 // ─── SPARKLINE ───────────────────────────────────────────────
-// Deterministic synthetic history seeded from market ID
+// Deterministic synthetic history — momentum-based, high variation
 function seedHistory(marketId, baseProbs) {
   let seed = 0;
   for (let i = 0; i < marketId.length; i++) seed += marketId.charCodeAt(i);
@@ -98,17 +98,29 @@ function seedHistory(marketId, baseProbs) {
     return (seed >>> 0) / 0xffffffff;
   };
 
+  const total = baseProbs.reduce((s, p) => s + p, 0);
+
+  // Start well away from the base to create an interesting chart shape
+  let probs = baseProbs.map(p => Math.max(2, p + (rand() - 0.5) * 35));
+  let s = probs.reduce((a, p) => a + p, 0);
+  probs = probs.map(p => (p / s) * total);
+
+  // Per-option momentum — creates trending runs, not just noise
+  let momentum = probs.map(() => (rand() - 0.5) * 5);
+
   const history = [];
-  let probs = [...baseProbs];
-  for (let step = 0; step < 16; step++) {
-    const total = probs.reduce((s, p) => s + p, 0);
-    probs = probs.map(p => Math.max(1, p + (rand() - 0.5) * 4));
-    const newTotal = probs.reduce((s, p) => s + p, 0);
-    probs = probs.map(p => (p / newTotal) * total);
+  for (let step = 0; step < 30; step++) {
+    // Gravity pulls toward base probs (realistic mean-reversion)
+    momentum = momentum.map((m, i) => {
+      const gravity = (baseProbs[i] - probs[i]) * 0.06;
+      return m * 0.72 + (rand() - 0.5) * 8 + gravity;
+    });
+    probs = probs.map((p, i) => Math.max(1, p + momentum[i]));
+    s = probs.reduce((a, p) => a + p, 0);
+    probs = probs.map(p => (p / s) * total);
     history.push([...probs]);
   }
-  // Final point near base
-  history.push([...baseProbs]);
+  history.push([...baseProbs]); // end at current base
   return history;
 }
 
@@ -268,7 +280,7 @@ function renderMarkets() {
 
 // ─── MODAL CHART ─────────────────────────────────────────────
 function renderModalChart(history, options, probs) {
-  const W = 400, H = 140, PAD = 6;
+  const W = 400, H = 200, PAD = 6;
   // Show ALL options in the expanded modal (including NO for binary)
   const n = Math.min(options.length, OPTION_COLORS.length);
 
@@ -284,8 +296,9 @@ function renderModalChart(history, options, probs) {
   if (!history || history.length < 2) {
     return `<div class="market-chart-legend">${legend}</div>
       <div class="modal-chart-svg"><svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none">
-        <line x1="0" y1="${H/2}" x2="${W}" y2="${H/2}" stroke="#e5e7eb" stroke-width="1.5"/>
-      </svg></div>`;
+        <line x1="0" y1="${H/2}" x2="${W}" y2="${H/2}" stroke="#e5e7eb" stroke-width="2"/>
+      </svg></div>
+      <div class="modal-trade-divider"></div>`;
   }
 
   const allVals = history.flatMap(snap =>
@@ -315,7 +328,8 @@ function renderModalChart(history, options, probs) {
   }
 
   return `<div class="market-chart-legend">${legend}</div>
-    <div class="modal-chart-svg"><svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none">${paths.join('')}</svg></div>`;
+    <div class="modal-chart-svg"><svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none">${paths.join('')}</svg></div>
+    <div class="modal-trade-divider"></div>`;
 }
 
 // ─── BET MODAL ───────────────────────────────────────────────
@@ -454,17 +468,23 @@ function subscribeToActivity() {
     const data = snap.val();
     if (!data) return;
     const bets = Object.values(data).sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
-    document.getElementById("activity-feed").innerHTML = bets.slice(0, 20).map(bet => `
-      <div class="activity-item">
+    document.getElementById("activity-feed").innerHTML = bets.slice(0, 10).map((bet, i) => {
+      const label = bet.option || bet.side || "YES";
+      const isNo  = label.toUpperCase() === "NO";
+      // Fade out the last 3 items
+      const opacity = i <= 6 ? 1 : Math.max(0.1, 1 - (i - 6) * 0.3);
+      return `
+      <div class="activity-item" style="opacity:${opacity}">
         <div class="activity-avatar">${getInitials(bet.userName || "?")}</div>
         <div class="activity-text">
           <strong>${bet.userName || "Anonymous"}</strong>
           bet on <strong>${(bet.marketTitle || "a market").slice(0, 45)}${(bet.marketTitle?.length || 0) > 45 ? "…" : ""}</strong>
         </div>
-        <div class="activity-side${(bet.option === 'NO' || bet.side === 'NO') ? ' no' : ''}">${bet.option || bet.side || "YES"}</div>
+        <div class="activity-side${isNo ? " no" : ""}">${label}</div>
         <div class="activity-amount">$${bet.amount}</div>
         <div class="activity-time">${timeAgo(bet.timestamp)}</div>
-      </div>`).join("");
+      </div>`;
+    }).join("");
   });
 }
 
