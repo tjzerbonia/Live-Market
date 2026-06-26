@@ -703,6 +703,23 @@ main {
 .bet-option-btn.longshot.active {
   opacity: 1;
 }
+.bet-option-btn.h2h {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.65rem 1rem;
+  flex: 1;
+}
+.bet-option-avatar {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  background-size: cover;
+  background-position: center;
+  background-color: var(--bg-hover);
+  flex-shrink: 0;
+}
 .bet-option-prob {
   font-size: 0.72rem;
   font-weight: 400;

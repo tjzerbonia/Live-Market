@@ -746,6 +746,14 @@ function fmtProb(p) {
   return `${Math.round(p)}%`;
 }
 
+// Returns avatar src for an option label — matches against usersMap by name, falls back to profile_default.jpg
+function getAvatarForOption(optLabel) {
+  const match = Object.values(usersMap).find(
+    u => u.name && u.name.toLowerCase() === optLabel.toLowerCase()
+  );
+  return (match && match.avatar) ? match.avatar : "profile_default.jpg";
+}
+
 // Rebuilds option buttons — called once on open and on option switch
 function updateBetOptions() {
   const market = allMarkets[activeBet.marketId];
@@ -753,13 +761,17 @@ function updateBetOptions() {
   const probs   = getCurrentProbs(activeBet.marketId, market);
   const options = market.options || ["YES", "NO"];
   const isOpen  = market.status === "open";
+  const isHeadToHead = options.length === 2 && !(options[0] === "YES" && options[1] === "NO");
 
   document.getElementById("bet-options-row").innerHTML = options.slice(0, 5).map((opt, i) => {
     const p      = probs[i] || 0;
     const active = i === activeBet.optionIndex ? " active" : "";
     const dim    = p < 5 ? " longshot" : "";
-    return `<button class="bet-option-btn${active}${dim}" ${isOpen ? `onclick="selectOption(${i})"` : "disabled"}>
-      ${opt}<br><span class="bet-option-prob">${fmtProb(p)}</span>
+    const avatar = isHeadToHead
+      ? `<div class="bet-option-avatar" style="background-image:url(${getAvatarForOption(opt)})"></div>`
+      : "";
+    return `<button class="bet-option-btn${active}${dim}${isHeadToHead ? " h2h" : ""}" ${isOpen ? `onclick="selectOption(${i})"` : "disabled"}>
+      ${avatar}${opt}<br><span class="bet-option-prob">${fmtProb(p)}</span>
     </button>`;
   }).join("");
 }
