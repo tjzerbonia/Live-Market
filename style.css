@@ -533,6 +533,51 @@ main {
   margin: 0.5rem 0 0.25rem;
 }
 
+/* Multi-option horizontal bar chart */
+.modal-bar-chart {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  margin: 0.75rem 0 0.25rem;
+}
+
+.modal-bar-row {
+  display: grid;
+  grid-template-columns: 110px 1fr 42px;
+  align-items: center;
+  gap: 0.6rem;
+}
+.modal-bar-row.longshot { opacity: 0.55; }
+
+.modal-bar-name {
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.modal-bar-track {
+  background: var(--bg-hover);
+  border-radius: var(--radius-pill);
+  height: 10px;
+  overflow: hidden;
+}
+
+.modal-bar-fill {
+  height: 100%;
+  border-radius: var(--radius-pill);
+  transition: width 0.4s ease;
+}
+
+.modal-bar-pct {
+  font-size: 0.82rem;
+  font-weight: 700;
+  text-align: right;
+  white-space: nowrap;
+}
+
 .modal-option-row {
   display: flex;
   align-items: center;
@@ -941,8 +986,9 @@ main {
     overflow-y: auto;
   }
 
-  /* Remove only the redundant tall elements */
+  /* Remove tall elements on mobile */
   .modal-options-table { display: none; }
+  .modal-bar-chart     { display: none; }
   .modal-trade-divider { display: none; }
 
   /* Compact legend — single row, smaller text */

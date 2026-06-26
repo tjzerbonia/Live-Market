@@ -514,27 +514,48 @@ function renderModalChart(history, options, probs) {
     </div>`;
   }).join('');
 
-  // Options breakdown table
   const isBinary = options.length === 2 && options[0] === 'YES' && options[1] === 'NO';
-  const table = options.slice(0, n).map((opt, i) => {
-    const p    = probs[i] || 0;
-    const noP  = 100 - Math.round(p);
-    const dim  = p < 5 ? ' longshot' : '';
-    return `<div class="modal-option-row${dim}">
-      <div class="modal-option-dot" style="background:${OPTION_COLORS[i]}"></div>
-      <div class="modal-option-name">${opt}</div>
-      <div class="modal-option-pills">
-        ${isBinary
-          ? `<span class="modal-pill yes">${fmtProb(p)}</span><span class="modal-pill no">${fmtProb(noP)}</span>`
-          : `<span class="modal-pill yes">${fmtProb(p)}</span>`}
-      </div>
-    </div>`;
-  }).join('');
+
+  // For binary markets: simple pill table
+  // For multi-option: horizontal bar chart per option
+  let breakdown = '';
+  if (isBinary) {
+    breakdown = `<div class="modal-options-table">${options.slice(0, n).map((opt, i) => {
+      const p   = probs[i] || 0;
+      const noP = 100 - Math.round(p);
+      return `<div class="modal-option-row${p < 5 ? ' longshot' : ''}">
+        <div class="modal-option-dot" style="background:${OPTION_COLORS[i]}"></div>
+        <div class="modal-option-name">${opt}</div>
+        <div class="modal-option-pills">
+          <span class="modal-pill yes">${fmtProb(p)}</span>
+          <span class="modal-pill no">${fmtProb(noP)}</span>
+        </div>
+      </div>`;
+    }).join('')}</div>`;
+  } else {
+    // Horizontal bar chart — sorted by probability descending
+    const sorted = options.slice(0, n)
+      .map((opt, i) => ({ opt, i, p: probs[i] || 0 }))
+      .sort((a, b) => b.p - a.p);
+    const maxP = Math.max(...sorted.map(s => s.p), 1);
+
+    breakdown = `<div class="modal-bar-chart">${sorted.map(({ opt, i, p }) => {
+      const barW   = Math.round((p / maxP) * 100);
+      const dim    = p < 5 ? ' longshot' : '';
+      return `<div class="modal-bar-row${dim}">
+        <div class="modal-bar-name">${opt}</div>
+        <div class="modal-bar-track">
+          <div class="modal-bar-fill" style="width:${barW}%;background:${OPTION_COLORS[i]}"></div>
+        </div>
+        <div class="modal-bar-pct" style="color:${OPTION_COLORS[i]}">${fmtProb(p)}</div>
+      </div>`;
+    }).join('')}</div>`;
+  }
 
   return `
     <div class="market-chart-legend">${legend}</div>
     <div class="modal-chart-svg"><svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none">${svg}</svg></div>
-    <div class="modal-options-table">${table}</div>
+    ${breakdown}
     <div class="modal-trade-divider"></div>`;
 }
 
