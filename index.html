@@ -17,6 +17,7 @@
       <h2>Welcome to Forecast</h2>
       <p>Pick a display name to start trading. No account needed.</p>
       <input type="text" id="nickname-input" placeholder="Your display name" maxlength="24" autocomplete="off" />
+      <div id="nickname-error" class="nickname-error hidden"></div>
       <button id="nickname-submit">Enter Markets</button>
     </div>
   </div>
@@ -77,15 +78,26 @@
       <div class="bet-amount-row">
         <label>Amount</label>
         <div class="amount-controls">
-          <button onclick="adjustAmount(-10)">-$10</button>
-          <span id="bet-amount-display">$10</span>
-          <button onclick="adjustAmount(10)">+$10</button>
+          <button onclick="adjustAmount(-betStep())">-</button>
+          <input type="number" id="bet-amount-input" min="1" value="10" oninput="onAmountInput(this.value)" />
+          <button onclick="adjustAmount(betStep())">+</button>
         </div>
         <div class="quick-amounts">
           <button onclick="setAmount(10)">$10</button>
           <button onclick="setAmount(25)">$25</button>
           <button onclick="setAmount(50)">$50</button>
           <button onclick="setAmount(100)">$100</button>
+          <button onclick="setAmount(250)">$250</button>
+        </div>
+        <div class="step-row">
+          <label>Step</label>
+          <div class="step-btns">
+            <button onclick="setStep(1)" id="step-1">$1</button>
+            <button onclick="setStep(5)" id="step-5">$5</button>
+            <button onclick="setStep(10)" id="step-10" class="active">$10</button>
+            <button onclick="setStep(25)" id="step-25">$25</button>
+            <button onclick="setStep(50)" id="step-50">$50</button>
+          </div>
         </div>
       </div>
       <div class="bet-payout-row">

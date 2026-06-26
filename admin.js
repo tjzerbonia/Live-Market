@@ -4,7 +4,7 @@
 
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
 import {
-  getDatabase, ref, push, onValue, update, remove
+  getDatabase, ref, push, onValue, update, remove, set, get
 } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
 
 const ADMIN_PASSWORD = "forecast2025";
@@ -305,7 +305,8 @@ function subscribeToPlayers() {
           <div class="player-name">${p.name || "Unknown"}</div>
           <div class="player-balance ${balClass}">$${bal.toLocaleString()}</div>
           <div class="player-seen">active ${seen}</div>
-          <button class="player-reset-btn" onclick="resetUser('${id}')">Reset to $1,000</button>
+          <button class="player-reset-btn" onclick="resetUser('${id}')">Reset</button>
+          <button class="player-delete-btn" onclick="deleteUser('${id}', '${(p.name||"").replace(/'/g,"\\'")}')">Delete</button>
         </div>`;
     }).join("");
   });
@@ -323,6 +324,13 @@ function timeAgo(ts) {
 window.resetUser = async function(userId) {
   await set(ref(db, `config/user_resets/${userId}`), Date.now());
   showToast("Balance reset sent.");
+};
+
+window.deleteUser = async function(userId, name) {
+  if (!confirm(`Delete player "${name}"? They will be prompted to pick a new name on next load.`)) return;
+  await remove(ref(db, `users/${userId}`));
+  await remove(ref(db, `config/user_resets/${userId}`));
+  showToast(`${name} deleted.`);
 };
 
 window.resetAllBalances = async function() {

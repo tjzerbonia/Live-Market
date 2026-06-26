@@ -158,6 +158,20 @@
 }
 .player-reset-btn:hover { background: var(--no-dim); }
 
+.player-delete-btn {
+  background: none;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text-dim);
+  font-size: 0.72rem;
+  font-weight: 600;
+  padding: 0.25rem 0.6rem;
+  cursor: pointer;
+  transition: all 0.15s;
+  white-space: nowrap;
+}
+.player-delete-btn:hover { color: var(--no); border-color: rgba(229,57,53,0.3); background: var(--no-dim); }
+
 /* === Admin layout === */
 .admin-layout {
   display: grid;

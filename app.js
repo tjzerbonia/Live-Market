@@ -4,7 +4,7 @@
 
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
 import {
-  getDatabase, ref, push, onValue, runTransaction, serverTimestamp, update
+  getDatabase, ref, push, onValue, runTransaction, serverTimestamp, update, get
 } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
 
 const firebaseConfig = {
@@ -22,7 +22,7 @@ const db = getDatabase(app);
 
 // ─── STATE ───────────────────────────────────────────────────
 let user = { id: null, name: null, balance: 1000 };
-let activeBet = { marketId: null, optionIndex: 0, amount: 10 };
+let activeBet = { marketId: null, optionIndex: 0, amount: 10, step: 10 };
 let allMarkets = {};
 let marketCurrentProbs = {};  // { marketId: number[] }
 let marketHistories = {};     // { marketId: number[][] }
@@ -45,13 +45,34 @@ function initUser() {
   }
 }
 
-function submitNickname() {
+async function submitNickname() {
   const name = document.getElementById("nickname-input").value.trim();
   if (!name) return;
+
+  const btn = document.getElementById("nickname-submit");
+  btn.disabled = true;
+  btn.textContent = "Checking...";
+
+  // Check for duplicate name in Firebase
+  const snap = await get(ref(db, "users"));
+  const existing = snap.val() || {};
+  const taken = Object.values(existing).some(u => u.name?.toLowerCase() === name.toLowerCase());
+
+  if (taken) {
+    const err = document.getElementById("nickname-error");
+    err.textContent = "That name is taken. Pick another.";
+    err.classList.remove("hidden");
+    btn.disabled = false;
+    btn.textContent = "Enter Markets";
+    return;
+  }
+
   user = { id: crypto.randomUUID(), name, balance: 1000 };
   localStorage.setItem("forecast_user", JSON.stringify(user));
   document.getElementById("nickname-overlay").classList.add("hidden");
   onUserReady();
+  btn.disabled = false;
+  btn.textContent = "Enter Markets";
 }
 
 function onUserReady() {
@@ -404,7 +425,7 @@ function updateBetModal() {
 
   document.getElementById("bet-odds-display").textContent =
     `${optionLabel} · ${Math.round(optionProb)}¢ per share`;
-  document.getElementById("bet-amount-display").textContent = `$${activeBet.amount}`;
+  document.getElementById("bet-amount-input").value = activeBet.amount;
   document.getElementById("payout-amount").textContent = `$${payout}`;
 }
 
@@ -413,16 +434,40 @@ window.selectOption = function(i) {
   updateBetModal();
 };
 
+window.betStep = function() { return activeBet.step; };
+
 window.adjustAmount = function(delta) {
-  const maxBet = user.balance + 1000; // can go to -$1,000
+  const maxBet = user.balance + 1000;
   activeBet.amount = Math.max(1, Math.min(maxBet, activeBet.amount + delta));
   updateBetModal();
 };
 
 window.setAmount = function(amount) {
   const maxBet = user.balance + 1000;
-  activeBet.amount = Math.min(maxBet, amount);
+  activeBet.amount = Math.max(1, Math.min(maxBet, amount));
   updateBetModal();
+};
+
+window.onAmountInput = function(val) {
+  const n = parseInt(val, 10);
+  if (!isNaN(n) && n >= 1) {
+    const maxBet = user.balance + 1000;
+    activeBet.amount = Math.min(maxBet, n);
+    // update payout without re-rendering the whole modal
+    const market   = allMarkets[activeBet.marketId];
+    const probs    = getCurrentProbs(activeBet.marketId, market);
+    const optionProb = probs[activeBet.optionIndex] || 50;
+    const payout   = Math.round(activeBet.amount / (optionProb / 100));
+    document.getElementById("payout-amount").textContent = `$${payout}`;
+  }
+};
+
+window.setStep = function(s) {
+  activeBet.step = s;
+  [1, 5, 10, 25, 50].forEach(v => {
+    const el = document.getElementById(`step-${v}`);
+    if (el) el.classList.toggle("active", v === s);
+  });
 };
 
 document.getElementById("bet-close").addEventListener("click", () => {
@@ -436,6 +481,10 @@ document.getElementById("bet-overlay").addEventListener("click", (e) => {
 // ─── SUBMIT BET ──────────────────────────────────────────────
 window.submitBet = async function() {
   if (!user.id) return;
+  // Sync amount from input field in case user typed directly
+  const inputVal = parseInt(document.getElementById("bet-amount-input").value, 10);
+  if (!isNaN(inputVal) && inputVal >= 1) activeBet.amount = inputVal;
+
   const btn = document.getElementById("submit-bet-btn");
   btn.disabled = true;
   btn.textContent = "Placing...";

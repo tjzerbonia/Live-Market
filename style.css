@@ -86,6 +86,14 @@ body {
 .modal input[type="text"]:focus { border-color: var(--accent); }
 .modal input::placeholder { color: var(--text-dim); }
 
+.nickname-error {
+  font-size: 0.8rem;
+  color: var(--no);
+  text-align: center;
+  margin-top: -0.25rem;
+}
+.nickname-error.hidden { display: none; }
+
 .modal button#nickname-submit {
   background: var(--accent);
   color: #fff;
@@ -489,17 +497,59 @@ main {
   color: var(--text-muted);
   padding: 0.6rem 1rem;
   cursor: pointer;
-  font-size: 0.9rem;
+  font-size: 1rem;
+  font-weight: 700;
   transition: background 0.15s, color 0.15s;
 }
 .amount-controls button:hover {
   background: var(--bg-hover);
   color: var(--text);
 }
-#bet-amount-display {
+#bet-amount-input {
   font-size: 1rem;
   font-weight: 700;
   color: var(--text);
+  background: none;
+  border: none;
+  outline: none;
+  text-align: center;
+  width: 70px;
+  -moz-appearance: textfield;
+}
+#bet-amount-input::-webkit-outer-spin-button,
+#bet-amount-input::-webkit-inner-spin-button { -webkit-appearance: none; }
+
+.step-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-top: 0.25rem;
+}
+.step-row label {
+  font-size: 0.72rem;
+  color: var(--text-dim);
+  white-space: nowrap;
+}
+.step-btns {
+  display: flex;
+  gap: 0.25rem;
+}
+.step-btns button {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text-muted);
+  font-size: 0.72rem;
+  padding: 0.2rem 0.45rem;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.step-btns button:hover { border-color: var(--accent); color: var(--accent); }
+.step-btns button.active {
+  background: var(--accent-dim);
+  border-color: rgba(0,168,107,0.3);
+  color: var(--accent);
+  font-weight: 600;
 }
 
 .quick-amounts { display: flex; gap: 0.4rem; }
