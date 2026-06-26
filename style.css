@@ -184,6 +184,16 @@ main {
   50% { opacity: 0.3; }
 }
 
+/* Chart endpoint dot pulse ring */
+.chart-dot-ring {
+  opacity: 0;
+  animation: chartDotPulse 2s ease-out infinite;
+}
+@keyframes chartDotPulse {
+  0%   { transform: scale(0.2); opacity: 0.6; }
+  100% { transform: scale(1);   opacity: 0; }
+}
+
 /* === Markets Grid === */
 .markets-grid {
   display: grid;
