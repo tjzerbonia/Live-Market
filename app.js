@@ -244,16 +244,30 @@ function expandRealData(real, base) {
 }
 
 function buildDisplayHistory(marketId, market) {
-  const base = market.baseProbs || [50, 50];
+  const base    = toArray(market.baseProbs) || [50, 50];
+  const current = getCurrentProbs(marketId, market);
+  const total   = base.reduce((s, p) => s + p, 0);
+  const normalize = arr => {
+    const s = arr.reduce((a, v) => a + v, 0);
+    return arr.map(v => (v / s) * total);
+  };
+
   const seed = seedHistory(marketId, base);
   const real = marketHistories[marketId];
   const expanded = expandRealData(real, base);
 
-  if (!expanded) return seed;
+  let history;
+  if (!expanded) {
+    history = seed;
+  } else {
+    const seedSlice = seed.slice(0, Math.ceil(seed.length * 0.72));
+    history = [...seedSlice, ...expanded];
+  }
 
-  // Seed fills the left 72%, real data fills the right 28%
-  const seedSlice = seed.slice(0, Math.ceil(seed.length * 0.72));
-  return [...seedSlice, ...expanded];
+  // Always force the final point to the actual current probability so the
+  // endpoint dot is always accurate regardless of amplification drift.
+  history[history.length - 1] = normalize(current);
+  return history;
 }
 
 // Catmull-Rom spline — smooth continuous curves with natural tangents
@@ -333,8 +347,8 @@ function buildChart(history, options, W, H, PAD, strokeW, dotR, showAll, thinFac
 
 function renderSparkline(history, options, probs) {
   const W = 260, H = 95, PAD = 5;
-  // Card view: thin to every 2nd point, Catmull-Rom curves
-  const { n, svg } = buildChart(history, options, W, H, PAD, 2.2, 4, false, 2);
+  // Card view: thin to every 3rd point for cleaner curves
+  const { n, svg } = buildChart(history, options, W, H, PAD, 2.2, 4, false, 3);
 
   const legend = options.slice(0, n).map((opt, i) => {
     const p = Math.round(probs[i] || 0);
@@ -499,8 +513,8 @@ function renderMarkets() {
 // ─── MODAL CHART ─────────────────────────────────────────────
 function renderModalChart(history, options, probs) {
   const W = 500, H = 220, PAD = 8;
-  // Modal: every 3rd point — clean curves at large size
-  const { n, svg } = buildChart(history, options, W, H, PAD, 2.5, 6, true, 3);
+  // Modal: thin to every 6th point — ~11 control points gives clean, readable curves
+  const { n, svg } = buildChart(history, options, W, H, PAD, 2.5, 6, true, 6);
 
   // Legend: colored dot + name + bold %
   const legend = options.slice(0, n).map((opt, i) => {
