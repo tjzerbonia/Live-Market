@@ -38,10 +38,11 @@
           <span class="balance-label">Balance</span>
           <span class="balance-amount" id="user-balance">$1,000</span>
         </div>
-        <div class="user-pill" id="user-display">
+        <div class="user-pill" id="user-display" onclick="document.getElementById('avatar-update-input').click()" title="Click to update photo">
           <div class="user-avatar" id="user-avatar"></div>
           <span id="user-name-display">—</span>
         </div>
+        <input type="file" id="avatar-update-input" accept="image/*" style="display:none" />
       </div>
     </div>
   </header>

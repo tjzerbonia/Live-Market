@@ -141,6 +141,21 @@ function onUserReady() {
   subscribeToMarketHistories();
   subscribeToConfig();
   subscribeToUserBalance();
+
+  document.getElementById("avatar-update-input").addEventListener("change", async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    const newAvatar = await resizeImage(file, 64);
+    user.avatar = newAvatar;
+    localStorage.setItem("forecast_user", JSON.stringify(user));
+    const el = document.getElementById("user-avatar");
+    el.style.backgroundImage = `url(${newAvatar})`;
+    el.textContent = "";
+    el.classList.add("has-image");
+    update(ref(db, `users/${user.id}`), { avatar: newAvatar });
+    showToast("Photo updated!");
+    e.target.value = "";
+  });
 }
 
 async function registerUserInFirebase() {

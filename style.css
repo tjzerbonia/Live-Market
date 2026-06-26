@@ -150,7 +150,9 @@ header {
   display: flex;
   align-items: center;
   gap: 0.5rem;
+  transition: border-color 0.15s, background 0.15s;
 }
+.user-pill:hover { background: var(--bg-hover); border-color: var(--border-accent); }
 
 /* Header user avatar circle */
 .user-avatar {
