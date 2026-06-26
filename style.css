@@ -1091,6 +1091,8 @@ main {
   /* Option buttons */
   .bet-options-row { gap: 0.3rem; margin-bottom: 0.6rem; }
   .bet-option-btn  { padding: 0.5rem 0.3rem; font-size: 0.78rem; min-width: 0; }
+  .bet-option-btn.h2h { padding: 0.6rem 0.5rem; min-width: 80px; }
+  .bet-option-avatar  { width: 40px; height: 40px; }
 
   /* History panel full width bottom sheet */
   .history-panel {
