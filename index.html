@@ -29,7 +29,7 @@
         <img src="kalshi_800.png" alt="Kalshi" />
       </div>
       <div class="header-right">
-        <div class="balance-pill">
+        <div class="balance-pill" id="balance-pill" onclick="openHistory()" title="View trade history">
           <span class="balance-label">Balance</span>
           <span class="balance-amount" id="user-balance">$1,000</span>
         </div>
@@ -63,6 +63,22 @@
       </div>
     </section>
   </main>
+
+  <!-- History panel -->
+  <div id="history-overlay" class="overlay hidden" onclick="if(event.target===this)closeHistory()">
+    <div class="history-panel">
+      <div class="history-header">
+        <div>
+          <div class="history-title">Your Trades</div>
+          <div class="history-subtitle" id="history-subtitle"></div>
+        </div>
+        <button class="modal-close" onclick="closeHistory()">&#x2715;</button>
+      </div>
+      <div class="history-list" id="history-list">
+        <div class="history-empty">Loading...</div>
+      </div>
+    </div>
+  </div>
 
   <!-- Bet modal -->
   <div id="bet-overlay" class="overlay hidden">

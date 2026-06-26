@@ -792,5 +792,78 @@ function subscribeToActivity() {
   });
 }
 
+// ─── TRADE HISTORY ───────────────────────────────────────────
+window.openHistory = function() {
+  document.getElementById("history-overlay").classList.remove("hidden");
+  renderHistory();
+};
+
+window.closeHistory = function() {
+  document.getElementById("history-overlay").classList.add("hidden");
+};
+
+async function renderHistory() {
+  const listEl     = document.getElementById("history-list");
+  const subtitleEl = document.getElementById("history-subtitle");
+  listEl.innerHTML = `<div class="history-empty">Loading...</div>`;
+
+  const snap   = await get(ref(db, "bets"));
+  const allBets = snap.val() || {};
+
+  const myBets = Object.values(allBets)
+    .filter(b => b.userId === user.id)
+    .sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
+
+  if (myBets.length === 0) {
+    listEl.innerHTML = `<div class="history-empty">No trades yet.</div>`;
+    subtitleEl.textContent = "";
+    return;
+  }
+
+  let totalWon = 0, totalLost = 0;
+
+  const rows = myBets.map(bet => {
+    const market     = allMarkets[bet.marketId];
+    const isResolved = market && market.status === "resolved";
+    const won        = isResolved && Number(market.resolvedOptionIndex) === Number(bet.optionIndex);
+    const lost       = isResolved && !won;
+    const pending    = !isResolved;
+
+    let statusClass, statusText, cashflow;
+    if (pending) {
+      statusClass = "history-status-pending";
+      statusText  = "Open";
+      cashflow    = `<span class="history-cf-neutral">-$${bet.amount.toLocaleString()}</span>`;
+    } else if (won) {
+      totalWon += bet.payout;
+      statusClass = "history-status-won";
+      statusText  = "Won";
+      cashflow    = `<span class="history-cf-win">+$${bet.payout.toLocaleString()}</span>`;
+    } else {
+      totalLost += bet.amount;
+      statusClass = "history-status-lost";
+      statusText  = "Lost";
+      cashflow    = `<span class="history-cf-loss">-$${bet.amount.toLocaleString()}</span>`;
+    }
+
+    const title = (bet.marketTitle || "Unknown market").slice(0, 50);
+    return `
+      <div class="history-row">
+        <div class="history-row-main">
+          <span class="history-status-pill ${statusClass}">${statusText}</span>
+          <div class="history-row-info">
+            <div class="history-row-title">${title}</div>
+            <div class="history-row-detail">${bet.option} · $${bet.amount.toLocaleString()} bet · $${bet.payout.toLocaleString()} to win · ${timeAgo(bet.timestamp)}</div>
+          </div>
+        </div>
+        <div class="history-cf">${cashflow}</div>
+      </div>`;
+  }).join("");
+
+  const net = totalWon - totalLost;
+  subtitleEl.innerHTML = `${myBets.length} trades · Net: <strong style="color:${net >= 0 ? 'var(--yes)' : 'var(--no)'}">${net >= 0 ? '+' : ''}$${net.toLocaleString()}</strong>`;
+  listEl.innerHTML = rows;
+}
+
 // ─── INIT ─────────────────────────────────────────────────────
 initUser();
