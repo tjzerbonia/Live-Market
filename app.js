@@ -182,12 +182,16 @@ function escHtml(str) {
     .replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 }
 
-// Insider trading guard — permissive: only exact whole-word match, 3+ char names, binary markets only
+// Insider trading guard — permissive: only exact whole-word match, 3+ char name tokens, binary markets only
 function isInsiderBlocked(marketTitle, userName, options) {
   const isBinary = options.length === 2 && options[0] === "YES" && options[1] === "NO";
-  if (!isBinary || !userName || userName.length < 3) return false;
-  const tokens = marketTitle.toLowerCase().replace(/[^a-z0-9\s]/g, " ").split(/\s+/).filter(Boolean);
-  return tokens.includes(userName.toLowerCase());
+  if (!isBinary || !userName) return false;
+  const titleTokens = new Set(
+    marketTitle.toLowerCase().replace(/[^a-z0-9\s]/g, " ").split(/\s+/).filter(Boolean)
+  );
+  // Split multi-word usernames and check each word >= 3 chars individually
+  const nameTokens = userName.toLowerCase().replace(/[^a-z0-9\s]/g, " ").split(/\s+/).filter(t => t.length >= 3);
+  return nameTokens.length > 0 && nameTokens.some(nt => titleTokens.has(nt));
 }
 
 function timeAgo(ts) {
@@ -706,19 +710,6 @@ window.openBetModal = function(marketId, optionIndex = 0) {
     }
   }
 
-  // Show/hide trading controls based on market status and insider block
-  const blocked       = isOpen && isInsiderBlocked(market.title, user.name, options);
-  const tradeControls = document.getElementById("bet-amount-row");
-  const submitBtn     = document.getElementById("submit-bet-btn");
-  const summaryEl     = document.getElementById("bet-summary");
-  const optionsRowEl = document.getElementById("bet-options-row");
-  if (tradeControls) tradeControls.style.display = (isOpen && !blocked) ? "" : "none";
-  if (submitBtn)     submitBtn.style.display     = (isOpen && !blocked) ? "" : "none";
-  if (optionsRowEl)  optionsRowEl.style.display  = (isOpen && !blocked) ? "" : "none";
-  if (summaryEl && blocked) {
-    summaryEl.innerHTML = `<span class="bet-summary-text bet-summary-closed">You're named in this market — trading restricted.</span>`;
-  }
-
   // Reset input field and hint
   const inputEl = document.getElementById("bet-amount-input");
   const hintEl  = document.getElementById("bet-input-hint");
@@ -727,6 +718,19 @@ window.openBetModal = function(marketId, optionIndex = 0) {
 
   document.getElementById("bet-overlay").classList.remove("hidden");
   updateBetModal();
+
+  // Apply insider block AFTER updateBetModal so the restricted message isn't overwritten
+  const blocked       = isOpen && isInsiderBlocked(market.title, user.name, options);
+  const tradeControls = document.getElementById("bet-amount-row");
+  const submitBtn     = document.getElementById("submit-bet-btn");
+  const summaryEl     = document.getElementById("bet-summary");
+  const optionsRowEl  = document.getElementById("bet-options-row");
+  if (tradeControls) tradeControls.style.display = (isOpen && !blocked) ? "" : "none";
+  if (submitBtn)     submitBtn.style.display     = (isOpen && !blocked) ? "" : "none";
+  if (optionsRowEl)  optionsRowEl.style.display  = (isOpen && !blocked) ? "" : "none";
+  if (summaryEl && blocked) {
+    summaryEl.innerHTML = `<span class="bet-summary-text bet-summary-closed">You're named in this market — trading restricted.</span>`;
+  }
 };
 
 function fmtCloseDate(str) {
