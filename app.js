@@ -558,8 +558,8 @@ window.openBetModal = function(marketId, optionIndex = 0) {
   // Show/hide trading controls based on market status
   const tradeControls = document.getElementById("bet-amount-row");
   const submitBtn     = document.getElementById("submit-bet-btn");
-  tradeControls.style.display = isOpen ? "" : "none";
-  submitBtn.style.display     = isOpen ? "" : "none";
+  if (tradeControls) tradeControls.style.display = isOpen ? "" : "none";
+  if (submitBtn)     submitBtn.style.display     = isOpen ? "" : "none";
 
   // Reset input field and hint
   const inputEl = document.getElementById("bet-amount-input");
