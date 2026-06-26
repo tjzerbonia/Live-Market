@@ -799,12 +799,12 @@ document.getElementById("bet-amount-input").addEventListener("input", (e) => {
   if (n > max) {
     activeBet.amount = max;
     e.target.value   = max;
-    hint.textContent = `Max: $${max.toLocaleString()} (balance + $1,000 limit)`;
+    hint.textContent = `Sorry, you've hit your limit — you can only go 1,000 Schmeckles in the hole.`;
     hint.className   = "bet-input-hint warn";
   } else if (n > user.balance) {
     activeBet.amount = n;
     const deficit = n - user.balance;
-    hint.textContent = `Goes $${deficit} into the red`;
+    hint.textContent = `Bold — you'd be $${deficit} in the hole on this one.`;
     hint.className   = "bet-input-hint warn";
   } else {
     activeBet.amount = n;
