@@ -194,7 +194,7 @@ function renderMarketList() {
           <div class="admin-market-stats">
             ${options.join(" / ")}
             · Vol: $${(m.volume || 0).toLocaleString()}
-            ${m.closeDate ? `· Closes ${m.closeDate}` : ""}
+            ${m.closeDate ? `· Closes ${formatCloseDate(m.closeDate)}` : ""}
           </div>
         </div>
         <div class="admin-market-actions">
@@ -374,6 +374,13 @@ function subscribeToPlayers() {
       });
     });
   });
+}
+
+function formatCloseDate(str) {
+  if (!str) return null;
+  const d = new Date(str);
+  if (isNaN(d)) return str;
+  return d.toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
 }
 
 function timeAgo(ts) {

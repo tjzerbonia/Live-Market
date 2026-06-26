@@ -367,7 +367,8 @@
 
 .form-group input[type="text"],
 .form-group input[type="number"],
-.form-group input[type="date"] {
+.form-group input[type="date"],
+.form-group input[type="datetime-local"] {
   background: var(--bg);
   border: 1px solid var(--border-accent);
   border-radius: var(--radius-sm);
