@@ -481,7 +481,7 @@ function renderMarkets() {
       : `<div class="market-bet-btns"></div>`;
 
     return `
-      <div class="market-card ${isClosed ? "market-card-closed" : ""}" ${isOpen ? `onclick="openBetModal('${id}',0)"` : ""}>
+      <div class="market-card ${isClosed ? "market-card-closed" : ""}" onclick="openBetModal('${id}',0)">
         <div class="market-card-header">
           <div class="market-category">${m.category || "General"}</div>
           ${statusBadge}
@@ -542,10 +542,11 @@ window.openBetModal = function(marketId, optionIndex = 0) {
   const market = allMarkets[marketId];
   if (!market) return;
 
-  activeBet.marketId = marketId;
+  activeBet.marketId    = marketId;
   activeBet.optionIndex = optionIndex;
-  activeBet.amount = 10;
+  activeBet.amount      = 10;
 
+  const isOpen  = market.status === "open";
   const options = market.options || ["YES", "NO"];
   const probs   = getCurrentProbs(marketId, market);
   const history = getHistory(marketId, market);
@@ -553,6 +554,13 @@ window.openBetModal = function(marketId, optionIndex = 0) {
   document.getElementById("bet-modal-category").textContent = market.category || "";
   document.getElementById("bet-modal-market-title").textContent = market.title;
   document.getElementById("modal-chart-area").innerHTML = renderModalChart(history, options, probs);
+
+  // Show/hide trading controls based on market status
+  const tradeControls = document.getElementById("bet-amount-row");
+  const submitBtn     = document.getElementById("submit-bet-btn");
+  tradeControls.style.display = isOpen ? "" : "none";
+  submitBtn.style.display     = isOpen ? "" : "none";
+
   document.getElementById("bet-overlay").classList.remove("hidden");
   updateBetModal();
 };
@@ -563,42 +571,65 @@ function fmtProb(p) {
   return `${Math.round(p)}%`;
 }
 
-function updateBetModal() {
+// Rebuilds option buttons — called once on open and on option switch
+function updateBetOptions() {
   const market = allMarkets[activeBet.marketId];
   if (!market) return;
-
   const probs   = getCurrentProbs(activeBet.marketId, market);
   const options = market.options || ["YES", "NO"];
+  const isOpen  = market.status === "open";
 
   document.getElementById("bet-options-row").innerHTML = options.slice(0, 5).map((opt, i) => {
     const p      = probs[i] || 0;
     const active = i === activeBet.optionIndex ? " active" : "";
     const dim    = p < 5 ? " longshot" : "";
-    return `<button class="bet-option-btn${active}${dim}" onclick="selectOption(${i})">
+    return `<button class="bet-option-btn${active}${dim}" ${isOpen ? `onclick="selectOption(${i})"` : "disabled"}>
       ${opt}<br><span class="bet-option-prob">${fmtProb(p)}</span>
     </button>`;
   }).join("");
+}
+
+// Only updates the summary line — called on every amount or option change
+function updateBetSummary() {
+  const market = allMarkets[activeBet.marketId];
+  if (!market) return;
+  const probs      = getCurrentProbs(activeBet.marketId, market);
+  const options    = market.options || ["YES", "NO"];
+  const isOpen     = market.status === "open";
+  const summaryEl  = document.getElementById("bet-summary");
+  if (!summaryEl) return;
+
+  if (!isOpen) {
+    summaryEl.innerHTML = `<span class="bet-summary-text bet-summary-closed">Market closed — no new trades</span>`;
+    return;
+  }
 
   const rawProb    = Math.max(0.5, probs[activeBet.optionIndex] || 50);
   const optionLabel = options[activeBet.optionIndex] || "Option";
   const payout      = Math.round(activeBet.amount / (rawProb / 100));
   const profit      = payout - activeBet.amount;
 
-  document.getElementById("bet-summary").innerHTML =
+  summaryEl.innerHTML =
     `<span class="bet-summary-text">Bet <strong>$${activeBet.amount}</strong> on <strong>${optionLabel}</strong> · win <strong>$${payout}</strong></span>` +
     `<span class="bet-summary-profit">+$${profit} profit</span>`;
 }
 
+function updateBetModal() {
+  updateBetOptions();
+  updateBetSummary();
+}
+
 window.selectOption = function(i) {
   activeBet.optionIndex = i;
-  updateBetModal();
+  updateBetOptions();
+  updateBetSummary();
 };
 
 function applyAmount(amount) {
   const maxBet = user.balance + 1000;
   activeBet.amount = Math.max(1, Math.min(maxBet, amount));
   document.getElementById("bet-amount-input").value = activeBet.amount;
-  updateBetModal();
+  updateBetSummary();
 }
 
 // Wire up +/- buttons
@@ -631,7 +662,7 @@ document.getElementById("bet-amount-input").addEventListener("input", (e) => {
   if (!isNaN(n) && n >= 1) {
     const maxBet = user.balance + 1000;
     activeBet.amount = Math.min(maxBet, n);
-    updateBetModal();
+    updateBetSummary();
   }
 });
 

@@ -215,12 +215,12 @@ main {
   box-shadow: 0 2px 12px rgba(0,0,0,0.08);
 }
 .market-card-closed {
-  cursor: default;
+  cursor: pointer;
   opacity: 0.65;
 }
 .market-card-closed:hover {
-  border-color: var(--border);
-  box-shadow: none;
+  border-color: var(--border-accent);
+  box-shadow: 0 2px 12px rgba(0,0,0,0.06);
 }
 .market-card-header {
   display: flex;
@@ -696,6 +696,11 @@ main {
   font-weight: 700;
   color: var(--yes);
   white-space: nowrap;
+}
+.bet-summary-closed {
+  color: var(--text-dim);
+  font-style: italic;
+  font-size: 0.8rem;
 }
 
 .submit-bet-btn {
