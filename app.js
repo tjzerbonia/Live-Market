@@ -462,11 +462,8 @@ function renderMarkets() {
 
     const chartHTML = renderSparkline(history, options, probs);
 
-    // Status badge shown on non-open markets
-    const statusBadge = isClosed
-      ? `<div class="market-status-badge ${isResolved ? "resolved" : "closed"}">
-          ${isResolved ? `Resolved: ${m.resolvedOption}` : "Closed"}
-        </div>`
+    const statusBadge = isClosed && !isResolved
+      ? `<div class="market-status-badge closed">Closed</div>`
       : "";
 
     const footerBtns = isOpen
@@ -487,6 +484,11 @@ function renderMarkets() {
           ${statusBadge}
         </div>
         <div class="market-title">${m.title}</div>
+        ${isResolved ? `
+        <div class="market-winner-banner">
+          <span class="market-winner-label">Winner</span>
+          <span class="market-winner-name">${m.resolvedOption}</span>
+        </div>` : ""}
         ${chartHTML}
         <div class="market-footer">
           <div class="market-vol">Vol: $${(m.volume || 0).toLocaleString()}</div>
@@ -606,7 +608,10 @@ function updateBetSummary() {
   if (!summaryEl) return;
 
   if (!isOpen) {
-    summaryEl.innerHTML = `<span class="bet-summary-text bet-summary-closed">Market closed — no new trades</span>`;
+    const isResolved = market.status === "resolved";
+    summaryEl.innerHTML = isResolved
+      ? `<span class="bet-summary-winner-icon">🏆</span><span class="bet-summary-text"><strong>${market.resolvedOption}</strong> won this market</span>`
+      : `<span class="bet-summary-text bet-summary-closed">Market closed — no new trades</span>`;
     return;
   }
 
