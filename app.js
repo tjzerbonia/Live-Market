@@ -54,31 +54,42 @@ function resizeImage(file, size = 64) {
   });
 }
 
-let pendingAvatar = null;   // base64 string set before submit
-let _justRegistered = false; // true only during new account creation
+let pendingAvatar = null; // base64 string set before submit
 
-function initUser() {
+async function initUser() {
   const stored = localStorage.getItem("forecast_user");
   if (stored) {
     user = JSON.parse(stored);
+    // Verify the user hasn't been deleted by admin before setting up any subscriptions.
+    // Doing this first prevents race conditions where subscribeToConfig() would
+    // re-create the deleted user node before the existence check could catch it.
+    const snap = await get(ref(db, `users/${user.id}`));
+    if (!snap.exists()) {
+      localStorage.removeItem("forecast_user");
+      user = { id: null, name: null, balance: 1000 };
+      showNicknameModal();
+      return;
+    }
     onUserReady();
   } else {
-    document.getElementById("nickname-overlay").classList.remove("hidden");
-    document.getElementById("nickname-input").addEventListener("keydown", (e) => {
-      if (e.key === "Enter") submitNickname();
-    });
-    document.getElementById("nickname-submit").addEventListener("click", submitNickname);
-
-    // Avatar file picker
-    document.getElementById("avatar-file-input").addEventListener("change", async (e) => {
-      const file = e.target.files[0];
-      if (!file) return;
-      pendingAvatar = await resizeImage(file, 64);
-      const preview = document.getElementById("avatar-preview");
-      preview.style.backgroundImage = `url(${pendingAvatar})`;
-      preview.classList.add("has-image");
-    });
+    showNicknameModal();
   }
+}
+
+function showNicknameModal() {
+  document.getElementById("nickname-overlay").classList.remove("hidden");
+  document.getElementById("nickname-input").addEventListener("keydown", (e) => {
+    if (e.key === "Enter") submitNickname();
+  });
+  document.getElementById("nickname-submit").addEventListener("click", submitNickname);
+  document.getElementById("avatar-file-input").addEventListener("change", async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    pendingAvatar = await resizeImage(file, 64);
+    const preview = document.getElementById("avatar-preview");
+    preview.style.backgroundImage = `url(${pendingAvatar})`;
+    preview.classList.add("has-image");
+  });
 }
 
 async function submitNickname() {
@@ -105,7 +116,6 @@ async function submitNickname() {
 
   user = { id: crypto.randomUUID(), name, balance: 1000, avatar: pendingAvatar || null };
   localStorage.setItem("forecast_user", JSON.stringify(user));
-  _justRegistered = true;
   document.getElementById("nickname-overlay").classList.add("hidden");
   onUserReady();
   btn.disabled = false;
@@ -133,18 +143,6 @@ function onUserReady() {
 }
 
 async function registerUserInFirebase() {
-  // For returning users (loaded from localStorage), verify they still exist in Firebase.
-  // If admin deleted them, clear local data and reload to show the nickname prompt.
-  if (!_justRegistered) {
-    const existSnap = await get(ref(db, `users/${user.id}`));
-    if (!existSnap.exists()) {
-      localStorage.removeItem("forecast_user");
-      location.reload();
-      return;
-    }
-  }
-  _justRegistered = false;
-
   // Read Firebase balance first — never overwrite with a stale local value
   const snap = await get(ref(db, `users/${user.id}/balance`));
   const fbBalance = snap.val();
