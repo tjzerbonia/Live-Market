@@ -250,6 +250,40 @@ main {
   color: var(--yes);
 }
 
+/* Modal winner banner */
+.modal-winner-banner {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  background: rgba(0,168,107,0.08);
+  border: 1.5px solid rgba(0,168,107,0.3);
+  border-radius: var(--radius-sm);
+  padding: 0.75rem 1rem;
+  margin-bottom: 0.75rem;
+}
+.modal-winner-trophy {
+  font-size: 1.5rem;
+  line-height: 1;
+}
+.modal-winner-text {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+}
+.modal-winner-label {
+  font-size: 0.65rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--yes);
+}
+.modal-winner-name {
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: var(--yes);
+}
+
+/* Card winner banner */
 .market-winner-banner {
   display: flex;
   align-items: center;

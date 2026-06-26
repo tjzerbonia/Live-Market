@@ -557,6 +557,20 @@ window.openBetModal = function(marketId, optionIndex = 0) {
   document.getElementById("bet-modal-market-title").textContent = market.title;
   document.getElementById("modal-chart-area").innerHTML = renderModalChart(history, options, probs);
 
+  // Winner banner
+  const bannerEl = document.getElementById("modal-winner-banner");
+  if (bannerEl) {
+    if (market.status === "resolved" && market.resolvedOption) {
+      bannerEl.className = "modal-winner-banner";
+      bannerEl.innerHTML =
+        `<span class="modal-winner-trophy">🏆</span>` +
+        `<div class="modal-winner-text"><div class="modal-winner-label">Winner</div><div class="modal-winner-name">${market.resolvedOption}</div></div>`;
+    } else {
+      bannerEl.className = "hidden";
+      bannerEl.innerHTML = "";
+    }
+  }
+
   // Show/hide trading controls based on market status
   const tradeControls = document.getElementById("bet-amount-row");
   const submitBtn     = document.getElementById("submit-bet-btn");
