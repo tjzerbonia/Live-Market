@@ -157,8 +157,10 @@ function renderMarketList() {
   const container = document.getElementById("admin-market-list");
   let entries = Object.entries(allMarkets);
 
-  if (currentFilter !== "all") {
-    entries = entries.filter(([, m]) => m.status === currentFilter);
+  if (currentFilter === "open") {
+    entries = entries.filter(([, m]) => m.status === "open");
+  } else if (currentFilter === "closed") {
+    entries = entries.filter(([, m]) => m.status === "closed" || m.status === "resolved");
   }
   entries.sort((a, b) => (b[1].createdAt || 0) - (a[1].createdAt || 0));
 
@@ -168,14 +170,18 @@ function renderMarketList() {
   }
 
   container.innerHTML = entries.map(([id, m]) => {
-    const isOpen = m.status === "open";
+    const isOpen     = m.status === "open";
+    const isResolved = m.status === "resolved";
     const options = m.options || ["YES", "NO"];
+    const statusLabel = isOpen ? "Open" : isResolved ? "Resolved" : "Closed";
+    const statusClass = isOpen ? "open" : isResolved ? "resolved" : "closed";
     return `
-      <div class="admin-market-row ${isOpen ? "" : "closed"}">
+      <div class="admin-market-row ${isOpen ? "" : "closed"}" data-id="${id}">
         <div>
           <div class="admin-market-meta">
             <span class="admin-market-category">${m.category || "General"}</span>
-            <span class="market-status-pill ${isOpen ? "open" : "closed"}">${isOpen ? "Open" : "Closed"}</span>
+            <span class="market-status-pill ${statusClass}">${statusLabel}</span>
+            ${isResolved ? `<span class="resolved-winner-pill">Winner: ${m.resolvedOption}</span>` : ""}
           </div>
           <div class="admin-market-title">${m.title}</div>
           <div class="admin-market-stats">
@@ -185,10 +191,13 @@ function renderMarketList() {
           </div>
         </div>
         <div class="admin-market-actions">
-          <button class="admin-action-btn edit" onclick="startEdit('${id}')">Edit</button>
+          ${!isResolved ? `<button class="admin-action-btn edit" onclick="startEdit('${id}')">Edit</button>` : ""}
           ${isOpen
             ? `<button class="admin-action-btn close-market" onclick="setStatus('${id}','closed')">Close</button>`
-            : `<button class="admin-action-btn reopen" onclick="setStatus('${id}','open')">Reopen</button>`
+            : !isResolved
+              ? `<button class="admin-action-btn reopen" onclick="setStatus('${id}','open')">Reopen</button>
+                 <button class="admin-action-btn resolve" onclick="showResolveOptions('${id}')">Resolve</button>`
+              : ""
           }
           <button class="admin-action-btn delete" onclick="deleteMarket('${id}')">Delete</button>
         </div>
@@ -370,6 +379,80 @@ window.deleteUser = async function(userId, name) {
   showToast(`${name} deleted.`);
 };
 
+
+// ─── RESOLVE ──────────────────────────────────────────────────
+window.showResolveOptions = function(id) {
+  // Toggle picker off if already open
+  const existing = document.getElementById(`resolve-picker-${id}`);
+  if (existing) { existing.remove(); return; }
+
+  const m = allMarkets[id];
+  if (!m) return;
+  const options = m.options || ["YES", "NO"];
+
+  const picker = document.createElement("div");
+  picker.id = `resolve-picker-${id}`;
+  picker.className = "resolve-picker";
+  picker.innerHTML = `
+    <div class="resolve-picker-label">Which option won?</div>
+    <div class="resolve-picker-options">
+      ${options.map((opt, i) => `<button class="resolve-option-btn" data-id="${id}" data-idx="${i}">${opt}</button>`).join("")}
+    </div>
+    <button class="resolve-cancel-btn" onclick="document.getElementById('resolve-picker-${id}').remove()">Cancel</button>
+  `;
+  picker.querySelectorAll(".resolve-option-btn").forEach(btn => {
+    btn.addEventListener("click", () => resolveMarket(btn.dataset.id, parseInt(btn.dataset.idx, 10)));
+  });
+
+  // Insert picker after the market row
+  const row = document.querySelector(`.admin-market-row[data-id="${id}"]`);
+  if (row) row.after(picker);
+};
+
+window.resolveMarket = async function(id, winningIndex) {
+  const m = allMarkets[id];
+  if (!m) return;
+  const options = m.options || ["YES", "NO"];
+  const winner  = options[winningIndex];
+
+  if (!confirm(`Resolve "${m.title}"\n\nWinner: "${winner}"\n\nThis will pay out all winning bets. Cannot be undone.`)) return;
+
+  const picker = document.getElementById(`resolve-picker-${id}`);
+  if (picker) picker.remove();
+
+  // Read all bets
+  const betsSnap = await get(ref(db, "bets"));
+  const allBets  = betsSnap.val() || {};
+
+  // Tally payouts per user
+  const payouts = {};
+  Object.values(allBets).forEach(bet => {
+    if (bet.marketId !== id) return;
+    if (bet.optionIndex !== winningIndex) return;
+    payouts[bet.userId] = (payouts[bet.userId] || 0) + (bet.payout || 0);
+  });
+
+  const updates = {};
+
+  // Credit each winner's balance in Firebase
+  for (const [userId, payout] of Object.entries(payouts)) {
+    const balSnap = await get(ref(db, `users/${userId}/balance`));
+    const cur     = balSnap.val() ?? 1000;
+    updates[`users/${userId}/balance`] = cur + payout;
+  }
+
+  // Mark market resolved
+  updates[`markets/${id}/status`]              = "resolved";
+  updates[`markets/${id}/resolvedOption`]      = winner;
+  updates[`markets/${id}/resolvedOptionIndex`] = winningIndex;
+  updates[`markets/${id}/resolvedAt`]          = Date.now();
+
+  await update(ref(db), updates);
+
+  const count = Object.keys(payouts).length;
+  const total = Object.values(payouts).reduce((s, p) => s + p, 0);
+  showToast(`Resolved: "${winner}" wins. $${total.toLocaleString()} paid to ${count} player(s).`);
+};
 
 // ─── STATUS / DELETE ──────────────────────────────────────────
 window.setStatus = async function(id, status) {

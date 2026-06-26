@@ -84,6 +84,7 @@ function onUserReady() {
   subscribeToMarketProbs();
   subscribeToMarketHistories();
   subscribeToConfig();
+  subscribeToUserBalance();
 }
 
 function registerUserInFirebase() {
@@ -123,108 +124,149 @@ function timeAgo(ts) {
 
 // ─── CHART ENGINE ─────────────────────────────────────────────
 
-// Seed: 6 narrative "chapters" interpolated cleanly — no per-step noise
+// Apply a rolling average to smooth out micro-noise while keeping big moves
+function rollingAvg(history, window = 5) {
+  const half = Math.floor(window / 2);
+  return history.map((snap, i) => {
+    const start = Math.max(0, i - half);
+    const end   = Math.min(history.length, i + half + 1);
+    const count = end - start;
+    return snap.map((_, oi) => {
+      const sum = history.slice(start, end).reduce((s, h) => s + h[oi], 0);
+      return sum / count;
+    });
+  });
+}
+
 function seedHistory(marketId, baseProbs) {
   let seed = 0;
-  for (let i = 0; i < marketId.length; i++) seed += marketId.charCodeAt(i);
+  for (let i = 0; i < marketId.length; i++) seed += marketId.charCodeAt(i) * (i + 1);
   const rand = () => {
     seed = (seed * 1664525 + 1013904223) & 0xffffffff;
     return (seed >>> 0) / 0xffffffff;
   };
 
   const total = baseProbs.reduce((s, p) => s + p, 0);
-  const normalize = (arr) => {
+  const normalize = arr => {
     const s = arr.reduce((a, v) => a + v, 0);
     return arr.map(v => (v / s) * total);
   };
 
-  // Build 6 anchor points — each one is a clear "event" shift
-  const ANCHORS = 6;
-  const anchors = [];
+  const POINTS = 60;
 
-  // Start offset from base
-  let cur = normalize(baseProbs.map(p => Math.max(2, p + (rand() - 0.5) * 30)));
-  anchors.push(cur);
+  // Starting state — meaningfully offset from base so there's a journey
+  let probs = normalize(baseProbs.map(p => Math.max(3, p + (rand() - 0.5) * 24)));
 
-  for (let a = 1; a < ANCHORS; a++) {
-    const t = a / (ANCHORS - 1); // 0→1 progression toward base
-    // Each anchor shifts one "winner" option meaningfully
-    const winner = Math.floor(rand() * baseProbs.length);
-    const shift = (rand() * 12 + 6) * (rand() > 0.45 ? 1 : -1);
-    let next = cur.map((p, i) => {
-      const gravity = (baseProbs[i] - p) * (0.15 + t * 0.25);
-      return Math.max(1, p + gravity + (i === winner ? shift : -shift / (baseProbs.length - 1)));
-    });
-    cur = normalize(next);
-    anchors.push(cur);
-  }
-  // Final anchor is exactly the base
-  anchors.push([...baseProbs]);
+  // 3 "narrative events" — each shifts one option over several steps
+  const events = [0.16, 0.40, 0.65].map(frac => ({
+    pos:      Math.floor(POINTS * (frac + (rand() - 0.5) * 0.07)),
+    mover:    Math.floor(rand() * baseProbs.length),
+    mag:      (rand() * 12 + 10) * (rand() > 0.40 ? 1 : -1),
+    duration: Math.floor(rand() * 6 + 6),
+  }));
 
-  // Interpolate each anchor pair with 4 steps → clean straight runs
-  const STEPS_PER = 4;
+  let momentum = new Array(baseProbs.length).fill(0);
   const history = [];
-  for (let a = 0; a < anchors.length - 1; a++) {
-    for (let s = 0; s < STEPS_PER; s++) {
-      const t = s / STEPS_PER;
-      history.push(anchors[a].map((v, i) => v + (anchors[a + 1][i] - v) * t));
+
+  for (let step = 0; step < POINTS; step++) {
+    events.forEach(evt => {
+      if (step >= evt.pos && step < evt.pos + evt.duration) {
+        momentum[evt.mover] += evt.mag / evt.duration;
+        probs.forEach((_, oi) => {
+          if (oi !== evt.mover) momentum[oi] -= (evt.mag / evt.duration) / (probs.length - 1);
+        });
+      }
+    });
+
+    momentum = momentum.map((m, i) => {
+      const gravity = (baseProbs[i] - probs[i]) * 0.06;
+      const noise   = (rand() - 0.5) * 0.18; // much quieter noise
+      return m * 0.85 + gravity + noise;
+    });
+
+    probs = normalize(probs.map((p, i) => Math.max(1, p + momentum[i])));
+    history.push([...probs]);
+  }
+
+  // Last 8 points gracefully converge toward current base
+  for (let i = 1; i <= 8; i++) {
+    const t = i / 8;
+    history.push(normalize(probs.map((p, oi) => p + (baseProbs[oi] - p) * t)));
+  }
+
+  // Apply rolling average to smooth micro-noise — preserves large moves
+  return rollingAvg(history, 5);
+}
+
+// Expand sparse real bet snapshots into smooth interpolated sub-steps
+function expandRealData(real, base) {
+  if (!real || real.length < 2) return null;
+  const total    = base.reduce((s, p) => s + p, 0);
+  const normalize = arr => {
+    const s = arr.reduce((a, v) => a + v, 0);
+    return arr.map(v => (v / s) * total);
+  };
+
+  const SUB = 10; // sub-steps between each real point
+  const expanded = [];
+
+  for (let i = 0; i < real.length - 1; i++) {
+    const from = real[i], to = real[i + 1];
+    for (let s = 0; s < SUB; s++) {
+      // Ease-in-out for organic feel
+      const t    = s / SUB;
+      const ease = t < 0.5 ? 2 * t * t : -1 + (4 - 2 * t) * t;
+      expanded.push(from.map((v, oi) => v + (to[oi] - v) * ease));
     }
   }
-  history.push([...baseProbs]);
-  return history;
-}
+  expanded.push([...real[real.length - 1]]);
 
-// Merge seed backdrop with sparse real bet data, amplify for visual impact
-function buildDisplayHistory(marketId, market) {
-  const base   = market.baseProbs || [50, 50];
-  const seed   = seedHistory(marketId, base);
-  const real   = marketHistories[marketId];
-
-  if (!real || real.length < 2) return seed;
-
-  // Use seed for first ~70% of the chart, real for the rest
-  const seedSlice = seed.slice(0, Math.ceil(seed.length * 0.70));
-
-  // Amplify real data: each real point is nudged away from the previous
-  // so tiny bet changes look like meaningful market moves
-  const amplified = [real[0]];
-  for (let i = 1; i < real.length; i++) {
+  // Amplify deltas 4× (capped at 7pts) so individual bets look meaningful
+  const amplified = [expanded[0]];
+  for (let i = 1; i < expanded.length; i++) {
     const prev = amplified[i - 1];
-    const raw  = real[i];
-    const amp  = raw.map((v, oi) => {
-      const delta = v - prev[oi];
-      // Amplify delta by 3x but cap at 8 points per step
-      return prev[oi] + Math.max(-8, Math.min(8, delta * 3));
-    });
-    // Keep sum constant
-    const total = base.reduce((s, p) => s + p, 0);
-    const s     = amp.reduce((a, v) => a + v, 0);
-    amplified.push(amp.map(v => Math.max(1, (v / s) * total)));
+    const curr = expanded[i];
+    const amp  = normalize(curr.map((v, oi) => {
+      const d = v - prev[oi];
+      return Math.max(1, prev[oi] + Math.max(-7, Math.min(7, d * 4)));
+    }));
+    amplified.push(amp);
   }
-
-  // Smooth the real tail with a 3-point rolling average
-  const smoothed = amplified.map((snap, i) => {
-    if (i === 0 || i === amplified.length - 1) return snap;
-    return snap.map((v, oi) =>
-      (amplified[i - 1][oi] + v + amplified[i + 1][oi]) / 3
-    );
-  });
-
-  return [...seedSlice, ...smoothed];
+  return amplified;
 }
 
-// Step-line SVG path
-function stepPath(pts) {
+function buildDisplayHistory(marketId, market) {
+  const base = market.baseProbs || [50, 50];
+  const seed = seedHistory(marketId, base);
+  const real = marketHistories[marketId];
+  const expanded = expandRealData(real, base);
+
+  if (!expanded) return seed;
+
+  // Seed fills the left 72%, real data fills the right 28%
+  const seedSlice = seed.slice(0, Math.ceil(seed.length * 0.72));
+  return [...seedSlice, ...expanded];
+}
+
+// Catmull-Rom spline — smooth continuous curves with natural tangents
+function catmullRomPath(pts, tension = 0.35) {
   if (pts.length < 2) return '';
-  let d = `M ${pts[0][0]},${pts[0][1]}`;
-  for (let i = 1; i < pts.length; i++) {
-    d += ` H ${pts[i][0]} V ${pts[i][1]}`;
+  let d = `M ${pts[0][0].toFixed(1)},${pts[0][1].toFixed(1)}`;
+  for (let i = 0; i < pts.length - 1; i++) {
+    const p0 = pts[Math.max(0, i - 1)];
+    const p1 = pts[i];
+    const p2 = pts[i + 1];
+    const p3 = pts[Math.min(pts.length - 1, i + 2)];
+    const cp1x = p1[0] + (p2[0] - p0[0]) * tension;
+    const cp1y = p1[1] + (p2[1] - p0[1]) * tension;
+    const cp2x = p2[0] - (p3[0] - p1[0]) * tension;
+    const cp2y = p2[1] - (p3[1] - p1[1]) * tension;
+    d += ` C ${cp1x.toFixed(1)},${cp1y.toFixed(1)} ${cp2x.toFixed(1)},${cp2y.toFixed(1)} ${p2[0].toFixed(1)},${p2[1].toFixed(1)}`;
   }
   return d;
 }
 
-// Core chart SVG builder — enforces minimum visual range so lines never go flat
-function buildChart(history, options, W, H, PAD, strokeW, dotR, showAll) {
+function buildChart(history, options, W, H, PAD, strokeW, dotR, showAll, thinFactor) {
   const isBinary = options.length === 2 && options[0] === 'YES' && options[1] === 'NO';
   const n = showAll ? Math.min(options.length, OPTION_COLORS.length)
                     : (isBinary ? 1 : Math.min(options.length, OPTION_COLORS.length));
@@ -233,42 +275,45 @@ function buildChart(history, options, W, H, PAD, strokeW, dotR, showAll) {
     return { n, svg: `<line x1="0" y1="${H/2}" x2="${W}" y2="${H/2}" stroke="#e5e7eb" stroke-width="1.5"/>` };
   }
 
-  const allVals = history.flatMap(snap => snap.slice(0, n));
-  const rawMin = Math.min(...allVals), rawMax = Math.max(...allVals);
+  // Optionally thin out points for card sparkline (less dense = cleaner curves)
+  const pts_src = thinFactor > 1
+    ? history.filter((_, i) => i % thinFactor === 0 || i === history.length - 1)
+    : history;
 
-  // Enforce minimum 20% visual range so chart never looks flat
-  const midpoint  = (rawMin + rawMax) / 2;
-  const halfRange = Math.max(12, (rawMax - rawMin) / 2 + 4);
-  const minP = Math.max(0,   midpoint - halfRange);
-  const maxP = Math.min(100, midpoint + halfRange);
+  const allVals = pts_src.flatMap(snap => snap.slice(0, n));
+  const rawMin = Math.min(...allVals), rawMax = Math.max(...allVals);
+  const mid      = (rawMin + rawMax) / 2;
+  const halfSpan = Math.max(12, (rawMax - rawMin) / 2 + 4);
+  const minP  = Math.max(0,   mid - halfSpan);
+  const maxP  = Math.min(100, mid + halfSpan);
   const range = maxP - minP || 1;
 
   const toXY = (snap, i, oi) => {
-    const x = PAD + (i / (history.length - 1)) * (W - 2 * PAD);
-    const prob = snap[oi] ?? 0;
-    const y = H - PAD - ((prob - minP) / range) * (H - 2 * PAD);
+    const x = PAD + (i / (pts_src.length - 1)) * (W - 2 * PAD);
+    const y = H - PAD - ((snap[oi] - minP) / range) * (H - 2 * PAD);
     return [parseFloat(x.toFixed(1)), parseFloat(y.toFixed(1))];
   };
 
   let svg = '';
-  // Draw lines back-to-front so primary line is on top
+  // Draw back-to-front so option 0 is always on top
   for (let oi = n - 1; oi >= 0; oi--) {
     const color = OPTION_COLORS[oi];
-    const pts   = history.map((snap, i) => toXY(snap, i, oi));
-    svg += `<path d="${stepPath(pts)}" fill="none" stroke="${color}" stroke-width="${strokeW}" stroke-linecap="square"/>`;
+    const pts   = pts_src.map((snap, i) => toXY(snap, i, oi));
+    svg += `<path d="${catmullRomPath(pts)}" fill="none" stroke="${color}" stroke-width="${strokeW}" stroke-linecap="round" stroke-linejoin="round"/>`;
   }
-  // Endpoint dots on top of all lines
+  // Endpoint dots — always visible on top
   for (let oi = 0; oi < n; oi++) {
     const color = OPTION_COLORS[oi];
-    const last  = toXY(history[history.length - 1], history.length - 1, oi);
-    svg += `<circle cx="${last[0]}" cy="${last[1]}" r="${dotR}" fill="${color}" stroke="#fff" stroke-width="1.5"/>`;
+    const [ex, ey] = toXY(pts_src[pts_src.length - 1], pts_src.length - 1, oi);
+    svg += `<circle cx="${ex}" cy="${ey}" r="${dotR}" fill="${color}" stroke="#fff" stroke-width="2"/>`;
   }
   return { n, svg };
 }
 
 function renderSparkline(history, options, probs) {
   const W = 260, H = 95, PAD = 5;
-  const { n, svg } = buildChart(history, options, W, H, PAD, 2, 4, false);
+  // Card view: thin to every 2nd point, Catmull-Rom curves
+  const { n, svg } = buildChart(history, options, W, H, PAD, 2.2, 4, false, 2);
 
   const legend = options.slice(0, n).map((opt, i) => {
     const p = Math.round(probs[i] || 0);
@@ -301,13 +346,28 @@ function subscribeToConfig() {
   onValue(ref(db, `config/user_resets/${user.id}`), (snap) => handleReset(snap.val()));
 }
 
+// Listen for admin-credited balance increases (bet payouts)
+function subscribeToUserBalance() {
+  onValue(ref(db, `users/${user.id}/balance`), (snap) => {
+    const fbBalance = snap.val();
+    if (fbBalance == null) return;
+    if (fbBalance > user.balance) {
+      const gained = Math.round(fbBalance - user.balance);
+      user.balance = fbBalance;
+      localStorage.setItem("forecast_user", JSON.stringify(user));
+      updateBalanceDisplay();
+      if (gained > 0) showToast(`+$${gained.toLocaleString()} payout credited!`);
+    }
+  });
+}
+
 // ─── FIREBASE SUBSCRIPTIONS ──────────────────────────────────
 function subscribeToMarkets() {
   onValue(ref(db, "markets"), (snap) => {
     const data = snap.val() || {};
     allMarkets = {};
     for (const [id, m] of Object.entries(data)) {
-      if (m.status !== "closed") allMarkets[id] = m;
+      if (m.status !== "closed" && m.status !== "resolved") allMarkets[id] = m;
     }
     renderMarkets();
   });
@@ -386,7 +446,8 @@ function renderMarkets() {
 // ─── MODAL CHART ─────────────────────────────────────────────
 function renderModalChart(history, options, probs) {
   const W = 500, H = 220, PAD = 8;
-  const { n, svg } = buildChart(history, options, W, H, PAD, 2.5, 6, true);
+  // Modal: every 3rd point — clean curves at large size
+  const { n, svg } = buildChart(history, options, W, H, PAD, 2.5, 6, true, 3);
 
   // Legend: colored dot + name + bold %
   const legend = options.slice(0, n).map((opt, i) => {
