@@ -182,6 +182,14 @@ function escHtml(str) {
     .replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 }
 
+// Insider trading guard — permissive: only exact whole-word match, 3+ char names, binary markets only
+function isInsiderBlocked(marketTitle, userName, options) {
+  const isBinary = options.length === 2 && options[0] === "YES" && options[1] === "NO";
+  if (!isBinary || !userName || userName.length < 3) return false;
+  const tokens = marketTitle.toLowerCase().replace(/[^a-z0-9\s]/g, " ").split(/\s+/).filter(Boolean);
+  return tokens.includes(userName.toLowerCase());
+}
+
 function timeAgo(ts) {
   if (!ts) return "just now";
   const diff = Math.floor((Date.now() - ts) / 1000);
@@ -558,15 +566,21 @@ function renderMarkets() {
       ? `<div class="market-status-badge closed">Closed</div>`
       : "";
 
+    const blocked = isOpen && user.id && isInsiderBlocked(m.title, user.name, options);
+
     const footerBtns = isOpen
-      ? (isBinary
+      ? (blocked
           ? `<div class="market-bet-btns" onclick="event.stopPropagation()">
-              <button class="bet-btn yes" onclick="openBetModal('${id}',0)">YES ${Math.round(probs[0])}¢</button>
-              <button class="bet-btn no"  onclick="openBetModal('${id}',1)">NO ${Math.round(probs[1])}¢</button>
+              <div class="bet-restricted-badge">Insider restricted</div>
             </div>`
-          : `<div class="market-bet-btns" onclick="event.stopPropagation()">
-              <button class="bet-btn trade" onclick="openBetModal('${id}',0)">Trade</button>
-            </div>`)
+          : (isBinary
+              ? `<div class="market-bet-btns" onclick="event.stopPropagation()">
+                  <button class="bet-btn yes" onclick="openBetModal('${id}',0)">YES ${Math.round(probs[0])}¢</button>
+                  <button class="bet-btn no"  onclick="openBetModal('${id}',1)">NO ${Math.round(probs[1])}¢</button>
+                </div>`
+              : `<div class="market-bet-btns" onclick="event.stopPropagation()">
+                  <button class="bet-btn trade" onclick="openBetModal('${id}',0)">Trade</button>
+                </div>`))
       : `<div class="market-bet-btns"></div>`;
 
     return `
@@ -692,11 +706,18 @@ window.openBetModal = function(marketId, optionIndex = 0) {
     }
   }
 
-  // Show/hide trading controls based on market status
+  // Show/hide trading controls based on market status and insider block
+  const blocked       = isOpen && isInsiderBlocked(market.title, user.name, options);
   const tradeControls = document.getElementById("bet-amount-row");
   const submitBtn     = document.getElementById("submit-bet-btn");
-  if (tradeControls) tradeControls.style.display = isOpen ? "" : "none";
-  if (submitBtn)     submitBtn.style.display     = isOpen ? "" : "none";
+  const summaryEl     = document.getElementById("bet-summary");
+  const optionsRowEl = document.getElementById("bet-options-row");
+  if (tradeControls) tradeControls.style.display = (isOpen && !blocked) ? "" : "none";
+  if (submitBtn)     submitBtn.style.display     = (isOpen && !blocked) ? "" : "none";
+  if (optionsRowEl)  optionsRowEl.style.display  = (isOpen && !blocked) ? "" : "none";
+  if (summaryEl && blocked) {
+    summaryEl.innerHTML = `<span class="bet-summary-text bet-summary-closed">You're named in this market — trading restricted.</span>`;
+  }
 
   // Reset input field and hint
   const inputEl = document.getElementById("bet-amount-input");

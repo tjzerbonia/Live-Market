@@ -505,6 +505,15 @@ main {
   color: var(--no);
   border: 1px solid rgba(229,57,53,0.2);
 }
+.bet-restricted-badge {
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: #9ca3af;
+  border: 1px solid #e5e7eb;
+  border-radius: var(--radius-pill);
+  padding: 0.3rem 0.75rem;
+  letter-spacing: 0.02em;
+}
 .bet-btn.trade {
   background: var(--accent-dim);
   color: var(--accent);
