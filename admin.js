@@ -24,6 +24,7 @@ const app = initializeApp(firebaseConfig);
 const db = getDatabase(app);
 
 let allMarkets = {};
+let allPlayers = {};
 let currentFilter = "open";
 const SESSION_KEY = "forecast_admin_auth";
 
@@ -288,6 +289,7 @@ function resetForm() {
 function subscribeToPlayers() {
   onValue(ref(db, "users"), (snap) => {
     const data = snap.val() || {};
+    allPlayers = data;
     const container = document.getElementById("admin-player-list");
     const players = Object.entries(data).sort((a, b) => (b[1].lastSeen || 0) - (a[1].lastSeen || 0));
 
@@ -301,14 +303,25 @@ function subscribeToPlayers() {
       const balClass = bal < 0 ? "negative" : "positive";
       const seen = p.lastSeen ? timeAgo(p.lastSeen) : "never";
       return `
-        <div class="admin-player-row">
+        <div class="admin-player-row" data-uid="${id}" data-name="${(p.name||"Unknown").replace(/"/g,"&quot;")}">
           <div class="player-name">${p.name || "Unknown"}</div>
           <div class="player-balance ${balClass}">$${bal.toLocaleString()}</div>
           <div class="player-seen">active ${seen}</div>
-          <button class="player-reset-btn" onclick="resetUser('${id}')">Reset</button>
-          <button class="player-delete-btn" onclick="deleteUser('${id}', '${(p.name||"").replace(/'/g,"\\'")}')">Delete</button>
+          <button class="player-reset-btn" data-uid="${id}">Reset</button>
+          <button class="player-delete-btn" data-uid="${id}">Delete</button>
         </div>`;
     }).join("");
+
+    // Attach events after render to avoid onclick escaping issues
+    container.querySelectorAll(".player-reset-btn").forEach(btn => {
+      btn.addEventListener("click", () => resetUser(btn.dataset.uid));
+    });
+    container.querySelectorAll(".player-delete-btn").forEach(btn => {
+      btn.addEventListener("click", () => {
+        const row = btn.closest(".admin-player-row");
+        deleteUser(btn.dataset.uid, row.dataset.name);
+      });
+    });
   });
 }
 
@@ -322,8 +335,11 @@ function timeAgo(ts) {
 }
 
 window.resetUser = async function(userId) {
-  await set(ref(db, `config/user_resets/${userId}`), Date.now());
-  showToast("Balance reset sent.");
+  await Promise.all([
+    set(ref(db, `config/user_resets/${userId}`), Date.now()),
+    update(ref(db, `users/${userId}`), { balance: 1000 }),
+  ]);
+  showToast("Balance reset to $1,000.");
 };
 
 window.deleteUser = async function(userId, name) {
@@ -333,10 +349,21 @@ window.deleteUser = async function(userId, name) {
   showToast(`${name} deleted.`);
 };
 
+window.clearTrades = async function() {
+  if (!confirm("Clear all recent trades from the activity feed? This cannot be undone.")) return;
+  await remove(ref(db, "bets"));
+  showToast("All trades cleared.");
+};
+
 window.resetAllBalances = async function() {
   if (!confirm("Reset ALL player balances to $1,000?")) return;
-  await set(ref(db, "config/balance_reset_at"), Date.now());
-  showToast("All balances reset.");
+  const resetTime = Date.now();
+  const updates = { "config/balance_reset_at": resetTime };
+  Object.keys(allPlayers).forEach(id => {
+    updates[`users/${id}/balance`] = 1000;
+  });
+  await update(ref(db), updates);
+  showToast("All balances reset to $1,000.");
 };
 
 // ─── STATUS / DELETE ──────────────────────────────────────────

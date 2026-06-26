@@ -122,7 +122,7 @@ function timeAgo(ts) {
 }
 
 // ─── SPARKLINE ───────────────────────────────────────────────
-// Deterministic synthetic history — momentum-based, high variation
+// Deterministic synthetic history — clean trending moves with a few key events
 function seedHistory(marketId, baseProbs) {
   let seed = 0;
   for (let i = 0; i < marketId.length; i++) seed += marketId.charCodeAt(i);
@@ -132,28 +132,29 @@ function seedHistory(marketId, baseProbs) {
   };
 
   const total = baseProbs.reduce((s, p) => s + p, 0);
+  const POINTS = 24; // fewer points = cleaner lines
 
-  // Start well away from the base to create an interesting chart shape
-  let probs = baseProbs.map(p => Math.max(2, p + (rand() - 0.5) * 35));
+  // Start offset from base — moderate, not extreme
+  let probs = baseProbs.map(p => Math.max(2, p + (rand() - 0.5) * 20));
   let s = probs.reduce((a, p) => a + p, 0);
   probs = probs.map(p => (p / s) * total);
 
-  // Per-option momentum — creates trending runs, not just noise
-  let momentum = probs.map(() => (rand() - 0.5) * 5);
+  // Slow momentum — changes direction infrequently for clean trends
+  let momentum = probs.map(() => (rand() - 0.5) * 3);
 
-  const history = [];
-  for (let step = 0; step < 30; step++) {
-    // Gravity pulls toward base probs (realistic mean-reversion)
+  const history = [[ ...probs ]];
+  for (let step = 0; step < POINTS - 1; step++) {
     momentum = momentum.map((m, i) => {
-      const gravity = (baseProbs[i] - probs[i]) * 0.06;
-      return m * 0.72 + (rand() - 0.5) * 8 + gravity;
+      const gravity = (baseProbs[i] - probs[i]) * 0.12; // stronger pull
+      const noise   = (rand() - 0.5) * 2;               // low noise
+      return m * 0.80 + noise + gravity;                 // high carry = smooth trends
     });
     probs = probs.map((p, i) => Math.max(1, p + momentum[i]));
     s = probs.reduce((a, p) => a + p, 0);
     probs = probs.map(p => (p / s) * total);
     history.push([...probs]);
   }
-  history.push([...baseProbs]); // end at current base
+  history.push([...baseProbs]);
   return history;
 }
 
@@ -331,10 +332,14 @@ function renderMarkets() {
 
 // ─── MODAL CHART ─────────────────────────────────────────────
 function renderModalChart(history, options, probs) {
-  const W = 400, H = 200, PAD = 6;
-  // Show ALL options in the expanded modal (including NO for binary)
+  const W = 480, H = 220;
+  const PAD_L = 36, PAD_R = 12, PAD_T = 12, PAD_B = 8;
+  const CW = W - PAD_L - PAD_R; // chart width
+  const CH = H - PAD_T - PAD_B; // chart height
+
   const n = Math.min(options.length, OPTION_COLORS.length);
 
+  // Legend rows
   const legend = options.slice(0, n).map((opt, i) => {
     const p = Math.round(probs[i] || 0);
     return `<div class="market-chart-legend-row">
@@ -346,40 +351,65 @@ function renderModalChart(history, options, probs) {
 
   if (!history || history.length < 2) {
     return `<div class="market-chart-legend">${legend}</div>
-      <div class="modal-chart-svg"><svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none">
-        <line x1="0" y1="${H/2}" x2="${W}" y2="${H/2}" stroke="#e5e7eb" stroke-width="2"/>
-      </svg></div>
-      <div class="modal-trade-divider"></div>`;
+      <div class="modal-chart-svg"><svg viewBox="0 0 ${W} ${H}">
+        <line x1="${PAD_L}" y1="${PAD_T + CH/2}" x2="${PAD_L + CW}" y2="${PAD_T + CH/2}" stroke="#e5e7eb" stroke-width="1.5"/>
+      </svg></div><div class="modal-trade-divider"></div>`;
   }
 
   const allVals = history.flatMap(snap =>
     Array.isArray(snap) ? snap.slice(0, n) : [snap]
   );
-  const minP = Math.max(0,   Math.min(...allVals) - 5);
-  const maxP = Math.min(100, Math.max(...allVals) + 5);
+  const rawMin = Math.min(...allVals);
+  const rawMax = Math.max(...allVals);
+  const pad = Math.max(4, (rawMax - rawMin) * 0.12);
+  const minP = Math.max(0,   rawMin - pad);
+  const maxP = Math.min(100, rawMax + pad);
   const range = maxP - minP || 1;
 
   const toXY = (snap, i, oi) => {
-    const x = PAD + (i / (history.length - 1)) * (W - 2 * PAD);
+    const x = PAD_L + (i / (history.length - 1)) * CW;
     const prob = Array.isArray(snap) ? (snap[oi] ?? 0) : snap;
-    const y = H - PAD - ((prob - minP) / range) * (H - 2 * PAD);
+    const y = PAD_T + CH - ((prob - minP) / range) * CH;
     return [parseFloat(x.toFixed(1)), parseFloat(y.toFixed(1))];
   };
 
-  const paths = [];
+  // Grid lines + Y-axis labels at 4 nice intervals
+  const gridCount = 4;
+  const gridLines = [];
+  const yLabels = [];
+  for (let g = 0; g <= gridCount; g++) {
+    const pct = minP + (range * g / gridCount);
+    const y = PAD_T + CH - (g / gridCount) * CH;
+    gridLines.push(
+      `<line x1="${PAD_L}" y1="${y.toFixed(1)}" x2="${PAD_L + CW}" y2="${y.toFixed(1)}" stroke="#f0f2f5" stroke-width="1"/>`
+    );
+    yLabels.push(
+      `<text x="${PAD_L - 5}" y="${(y + 4).toFixed(1)}" text-anchor="end" font-size="9" fill="#9ca3af">${Math.round(pct)}%</text>`
+    );
+  }
+
+  const elems = [...gridLines, ...yLabels];
+
   for (let oi = 0; oi < n; oi++) {
     const color = OPTION_COLORS[oi];
     const pts = history.map((snap, i) => toXY(snap, i, oi));
     const d = stepPath(pts);
     const [ex, ey] = pts[pts.length - 1];
-    paths.push(
+
+    // Subtle fill under the first (primary) line only
+    if (oi === 0) {
+      const fillD = d + ` L ${PAD_L + CW},${PAD_T + CH} L ${PAD_L},${PAD_T + CH} Z`;
+      elems.push(`<path d="${fillD}" fill="${color}" fill-opacity="0.07"/>`);
+    }
+
+    elems.push(
       `<path d="${d}" fill="none" stroke="${color}" stroke-width="2" stroke-linecap="square"/>`,
-      `<circle cx="${ex}" cy="${ey}" r="4" fill="${color}"/>`
+      `<circle cx="${ex}" cy="${ey}" r="4" fill="${color}" stroke="#fff" stroke-width="1.5"/>`
     );
   }
 
   return `<div class="market-chart-legend">${legend}</div>
-    <div class="modal-chart-svg"><svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none">${paths.join('')}</svg></div>
+    <div class="modal-chart-svg"><svg viewBox="0 0 ${W} ${H}">${elems.join('')}</svg></div>
     <div class="modal-trade-divider"></div>`;
 }
 

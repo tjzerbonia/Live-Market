@@ -112,7 +112,10 @@
       <section class="admin-players-section">
         <div class="list-header">
           <h2>Players</h2>
-          <button class="danger-btn" onclick="resetAllBalances()">Reset All to $1,000</button>
+          <div style="display:flex;gap:0.5rem">
+            <button class="danger-btn" onclick="clearTrades()">Clear All Trades</button>
+            <button class="danger-btn" onclick="resetAllBalances()">Reset All to $1,000</button>
+          </div>
         </div>
         <div id="admin-player-list">
           <div class="list-empty">No players yet.</div>
