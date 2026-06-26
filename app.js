@@ -901,7 +901,7 @@ function subscribeToActivity() {
     const data = snap.val();
     if (!data) return;
     cachedActivityBets = Object.values(data)
-      .filter(b => !b.type)  // exclude admin adjustments and other non-trade records
+      .filter(b => b.marketId)  // only real trades have a marketId
       .sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
     renderActivityFeed();
   });
