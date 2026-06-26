@@ -132,20 +132,6 @@ function timeAgo(ts) {
 
 // ─── CHART ENGINE ─────────────────────────────────────────────
 
-// Apply a rolling average to smooth out micro-noise while keeping big moves
-function rollingAvg(history, window = 5) {
-  const half = Math.floor(window / 2);
-  return history.map((snap, i) => {
-    const start = Math.max(0, i - half);
-    const end   = Math.min(history.length, i + half + 1);
-    const count = end - start;
-    return snap.map((_, oi) => {
-      const sum = history.slice(start, end).reduce((s, h) => s + h[oi], 0);
-      return sum / count;
-    });
-  });
-}
-
 function seedHistory(marketId, baseProbs) {
   let seed = 0;
   for (let i = 0; i < marketId.length; i++) seed += marketId.charCodeAt(i) * (i + 1);
@@ -160,87 +146,95 @@ function seedHistory(marketId, baseProbs) {
     return arr.map(v => (v / s) * total);
   };
 
+  // ── Checkpoint model ──────────────────────────────────────────
+  // Real markets look like: long plateau → sudden jump → new plateau.
+  // We generate 7 anchor states at irregular intervals.
+  // ~35% of transitions are meaningful moves; the rest are nearly flat.
+  // This gives the characteristic "step-function with smooth edges" look.
+
+  // Starting state — offset from base so there's somewhere to travel
+  let state = normalize(baseProbs.map(p => Math.max(2, p + (rand() - 0.5) * 22)));
+
+  const NUM_ANCHORS = 7;
+  const anchors = [{ t: 0, s: [...state] }];
+
+  for (let a = 1; a < NUM_ANCHORS; a++) {
+    // Irregular spacing: each anchor is 8–20% of timeline after the previous
+    const prevT = anchors[a - 1].t;
+    const gap   = 0.08 + rand() * 0.12;
+    const t     = Math.min(prevT + gap, 0.88);
+
+    if (rand() < 0.35) {
+      // Meaningful event: one option moves 12–22 pts, others absorb
+      const mover = Math.floor(rand() * baseProbs.length);
+      const dir   = rand() > 0.45 ? 1 : -1;
+      const mag   = (rand() * 10 + 12) * dir;
+      const next  = state.map((v, i) => i === mover ? Math.max(2, v + mag) : v);
+      state = normalize(next);
+    } else {
+      // Quiet: tiny drift toward base (market is sitting still)
+      state = normalize(state.map((v, i) => v + (baseProbs[i] - v) * rand() * 0.07));
+    }
+
+    anchors.push({ t, s: [...state] });
+  }
+
+  // Final anchor: converge toward base probs
+  anchors.push({ t: 1.0, s: normalize(baseProbs) });
+
+  // ── Expand anchors → 60-point history ─────────────────────────
+  // Between consecutive anchors interpolate with ease-in-out.
+  // No per-step noise — the motion lives at the anchor level.
   const POINTS = 60;
-
-  // Starting state — meaningfully offset from base so there's a journey
-  let probs = normalize(baseProbs.map(p => Math.max(3, p + (rand() - 0.5) * 24)));
-
-  // 3 "narrative events" — each shifts one option over several steps
-  const events = [0.16, 0.40, 0.65].map(frac => ({
-    pos:      Math.floor(POINTS * (frac + (rand() - 0.5) * 0.07)),
-    mover:    Math.floor(rand() * baseProbs.length),
-    mag:      (rand() * 12 + 10) * (rand() > 0.40 ? 1 : -1),
-    duration: Math.floor(rand() * 6 + 6),
-  }));
-
-  let momentum = new Array(baseProbs.length).fill(0);
   const history = [];
 
-  for (let step = 0; step < POINTS; step++) {
-    events.forEach(evt => {
-      if (step >= evt.pos && step < evt.pos + evt.duration) {
-        momentum[evt.mover] += evt.mag / evt.duration;
-        probs.forEach((_, oi) => {
-          if (oi !== evt.mover) momentum[oi] -= (evt.mag / evt.duration) / (probs.length - 1);
-        });
+  for (let i = 0; i < POINTS; i++) {
+    const t = i / (POINTS - 1);
+
+    // Find the surrounding anchor pair
+    let lo = anchors[0], hi = anchors[anchors.length - 1];
+    for (let a = 0; a < anchors.length - 1; a++) {
+      if (t >= anchors[a].t && t <= anchors[a + 1].t) {
+        lo = anchors[a]; hi = anchors[a + 1]; break;
       }
-    });
+    }
 
-    momentum = momentum.map((m, i) => {
-      const gravity = (baseProbs[i] - probs[i]) * 0.06;
-      const noise   = (rand() - 0.5) * 0.18; // much quieter noise
-      return m * 0.85 + gravity + noise;
-    });
+    const span   = hi.t - lo.t || 1;
+    const localT = (t - lo.t) / span;
+    // Ease-in-out: fast in middle, slower at plateau edges
+    const ease   = localT < 0.5 ? 2 * localT * localT : -1 + (4 - 2 * localT) * localT;
 
-    probs = normalize(probs.map((p, i) => Math.max(1, p + momentum[i])));
-    history.push([...probs]);
+    history.push(normalize(lo.s.map((v, oi) => v + (hi.s[oi] - v) * ease)));
   }
 
-  // Last 8 points gracefully converge toward current base
-  for (let i = 1; i <= 8; i++) {
-    const t = i / 8;
-    history.push(normalize(probs.map((p, oi) => p + (baseProbs[oi] - p) * t)));
-  }
-
-  // Apply rolling average to smooth micro-noise — preserves large moves
-  return rollingAvg(history, 5);
+  return history;
 }
 
-// Expand sparse real bet snapshots into smooth interpolated sub-steps
+// Expand sparse real bet snapshots into smooth sub-steps.
+// No artificial amplification — the bet weight formula already makes
+// large bets move the market visibly.
 function expandRealData(real, base) {
   if (!real || real.length < 2) return null;
-  const total    = base.reduce((s, p) => s + p, 0);
+  const total = base.reduce((s, p) => s + p, 0);
   const normalize = arr => {
     const s = arr.reduce((a, v) => a + v, 0);
     return arr.map(v => (v / s) * total);
   };
 
-  const SUB = 10; // sub-steps between each real point
+  const SUB = 8;
   const expanded = [];
 
   for (let i = 0; i < real.length - 1; i++) {
     const from = real[i], to = real[i + 1];
     for (let s = 0; s < SUB; s++) {
-      // Ease-in-out for organic feel
       const t    = s / SUB;
-      const ease = t < 0.5 ? 2 * t * t : -1 + (4 - 2 * t) * t;
-      expanded.push(from.map((v, oi) => v + (to[oi] - v) * ease));
+      // Fast initial reaction, then settle — mimics real market microstructure
+      const ease = t < 0.4 ? (t / 0.4) * (t / 0.4) : 1 - Math.pow(1 - (t - 0.4) / 0.6, 2) * 0.1;
+      expanded.push(normalize(from.map((v, oi) => v + (to[oi] - v) * ease)));
     }
   }
   expanded.push([...real[real.length - 1]]);
-
-  // Amplify deltas 4× (capped at 7pts) so individual bets look meaningful
-  const amplified = [expanded[0]];
-  for (let i = 1; i < expanded.length; i++) {
-    const prev = amplified[i - 1];
-    const curr = expanded[i];
-    const amp  = normalize(curr.map((v, oi) => {
-      const d = v - prev[oi];
-      return Math.max(1, prev[oi] + Math.max(-7, Math.min(7, d * 4)));
-    }));
-    amplified.push(amp);
-  }
-  return amplified;
+  return expanded;
 }
 
 function buildDisplayHistory(marketId, market) {
@@ -347,8 +341,8 @@ function buildChart(history, options, W, H, PAD, strokeW, dotR, showAll, thinFac
 
 function renderSparkline(history, options, probs) {
   const W = 260, H = 95, PAD = 5;
-  // Card view: thin to every 3rd point for cleaner curves
-  const { n, svg } = buildChart(history, options, W, H, PAD, 2.2, 4, false, 3);
+  // Card: every 4th point → ~15 anchors, smooth card curve
+  const { n, svg } = buildChart(history, options, W, H, PAD, 2.2, 4, false, 4);
 
   const legend = options.slice(0, n).map((opt, i) => {
     const p = Math.round(probs[i] || 0);
@@ -513,8 +507,8 @@ function renderMarkets() {
 // ─── MODAL CHART ─────────────────────────────────────────────
 function renderModalChart(history, options, probs) {
   const W = 500, H = 220, PAD = 8;
-  // Modal: thin to every 6th point — ~11 control points gives clean, readable curves
-  const { n, svg } = buildChart(history, options, W, H, PAD, 2.5, 6, true, 6);
+  // Modal: every 5th point → ~12 control points, clean readable curves
+  const { n, svg } = buildChart(history, options, W, H, PAD, 2.5, 6, true, 5);
 
   // Legend: colored dot + name + bold %
   const legend = options.slice(0, n).map((opt, i) => {
