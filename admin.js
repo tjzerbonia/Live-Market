@@ -235,7 +235,9 @@ window.saveMarket = async function() {
   const id       = document.getElementById("edit-market-id").value.trim();
   const title    = document.getElementById("f-title").value.trim();
   const category = document.getElementById("f-category").value.trim();
-  const closeDate = document.getElementById("f-closedate").value;
+  const dateVal = document.getElementById("f-closedate").value;
+  const timeVal = document.getElementById("f-closetime").value;
+  const closeDate = dateVal ? `${dateVal}T${timeVal || "00:00"}` : null;
 
   const options = [], baseProbs = [];
   document.querySelectorAll(".option-row").forEach(row => {
@@ -282,7 +284,9 @@ window.startEdit = function(id) {
   document.getElementById("edit-market-id").value = id;
   document.getElementById("f-title").value = m.title;
   document.getElementById("f-category").value = m.category || "";
-  document.getElementById("f-closedate").value = m.closeDate || "";
+  const [cdDate, cdTime] = (m.closeDate || "").split("T");
+  document.getElementById("f-closedate").value = cdDate || "";
+  document.getElementById("f-closetime").value = cdTime || "";
 
   const options   = m.options   || ["YES", "NO"];
   const baseProbs = m.baseProbs || [50, 50];
@@ -317,6 +321,7 @@ function resetForm() {
   document.getElementById("f-title").value = "";
   document.getElementById("f-category").value = "";
   document.getElementById("f-closedate").value = "";
+  document.getElementById("f-closetime").value = "";
 
   document.getElementById("options-list").innerHTML = `
     <div class="option-row" data-index="0">

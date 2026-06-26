@@ -413,10 +413,17 @@
   color: var(--text-dim);
 }
 
+.close-datetime-row {
+  display: flex;
+  gap: 0.5rem;
+}
+.close-datetime-row input[type="date"] { flex: 1.4; }
+.close-datetime-row input[type="time"] { flex: 1; }
+
 .form-group input[type="text"],
 .form-group input[type="number"],
 .form-group input[type="date"],
-.form-group input[type="datetime-local"] {
+.form-group input[type="time"] {
   background: var(--bg);
   border: 1px solid var(--border-accent);
   border-radius: var(--radius-sm);
