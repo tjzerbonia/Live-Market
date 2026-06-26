@@ -182,7 +182,7 @@ function escHtml(str) {
     .replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 }
 
-// Insider trading guard — permissive: only exact whole-word match, 3+ char name tokens, binary markets only
+// Insider trading guard — permissive: only exact whole-word match, 2+ char name tokens, binary markets only
 function isInsiderBlocked(marketTitle, userName, options) {
   const isBinary = options.length === 2 && options[0] === "YES" && options[1] === "NO";
   if (!isBinary || !userName) return false;
@@ -190,7 +190,7 @@ function isInsiderBlocked(marketTitle, userName, options) {
     marketTitle.toLowerCase().replace(/[^a-z0-9\s]/g, " ").split(/\s+/).filter(Boolean)
   );
   // Split multi-word usernames and check each word >= 3 chars individually
-  const nameTokens = userName.toLowerCase().replace(/[^a-z0-9\s]/g, " ").split(/\s+/).filter(t => t.length >= 3);
+  const nameTokens = userName.toLowerCase().replace(/[^a-z0-9\s]/g, " ").split(/\s+/).filter(t => t.length >= 2);
   return nameTokens.length > 0 && nameTokens.some(nt => titleTokens.has(nt));
 }
 
