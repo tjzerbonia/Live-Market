@@ -121,8 +121,9 @@ function timeAgo(ts) {
   return `${Math.floor(diff / 3600)}h ago`;
 }
 
-// ─── SPARKLINE ───────────────────────────────────────────────
-// Produces clean, well-separated trend lines like Kalshi reference
+// ─── CHART ENGINE ─────────────────────────────────────────────
+
+// Seed: 6 narrative "chapters" interpolated cleanly — no per-step noise
 function seedHistory(marketId, baseProbs) {
   let seed = 0;
   for (let i = 0; i < marketId.length; i++) seed += marketId.charCodeAt(i);
@@ -132,87 +133,143 @@ function seedHistory(marketId, baseProbs) {
   };
 
   const total = baseProbs.reduce((s, p) => s + p, 0);
-  const POINTS = 28;
+  const normalize = (arr) => {
+    const s = arr.reduce((a, v) => a + v, 0);
+    return arr.map(v => (v / s) * total);
+  };
 
-  // Start meaningfully different from base so there's a journey to show
-  let probs = baseProbs.map(p => Math.max(2, p + (rand() - 0.5) * 25));
-  let s = probs.reduce((a, p) => a + p, 0);
-  probs = probs.map(p => (p / s) * total);
+  // Build 6 anchor points — each one is a clear "event" shift
+  const ANCHORS = 6;
+  const anchors = [];
 
-  // Each option gets its own slow-moving momentum direction
-  let momentum = probs.map(() => (rand() - 0.5) * 2.5);
+  // Start offset from base
+  let cur = normalize(baseProbs.map(p => Math.max(2, p + (rand() - 0.5) * 30)));
+  anchors.push(cur);
 
-  const history = [[...probs]];
-  for (let step = 0; step < POINTS - 1; step++) {
-    momentum = momentum.map((m, i) => {
-      const gravity = (baseProbs[i] - probs[i]) * 0.10;
-      const noise   = (rand() - 0.5) * 1.5; // very low noise = clean lines
-      return m * 0.85 + noise + gravity;     // high carry keeps trends long
+  for (let a = 1; a < ANCHORS; a++) {
+    const t = a / (ANCHORS - 1); // 0→1 progression toward base
+    // Each anchor shifts one "winner" option meaningfully
+    const winner = Math.floor(rand() * baseProbs.length);
+    const shift = (rand() * 12 + 6) * (rand() > 0.45 ? 1 : -1);
+    let next = cur.map((p, i) => {
+      const gravity = (baseProbs[i] - p) * (0.15 + t * 0.25);
+      return Math.max(1, p + gravity + (i === winner ? shift : -shift / (baseProbs.length - 1)));
     });
-    probs = probs.map((p, i) => Math.max(1, p + momentum[i]));
-    s = probs.reduce((a, p) => a + p, 0);
-    probs = probs.map(p => (p / s) * total);
-    history.push([...probs]);
+    cur = normalize(next);
+    anchors.push(cur);
+  }
+  // Final anchor is exactly the base
+  anchors.push([...baseProbs]);
+
+  // Interpolate each anchor pair with 4 steps → clean straight runs
+  const STEPS_PER = 4;
+  const history = [];
+  for (let a = 0; a < anchors.length - 1; a++) {
+    for (let s = 0; s < STEPS_PER; s++) {
+      const t = s / STEPS_PER;
+      history.push(anchors[a].map((v, i) => v + (anchors[a + 1][i] - v) * t));
+    }
   }
   history.push([...baseProbs]);
   return history;
 }
 
-// Step-line path (flat → jump style, like a real prediction market chart)
+// Merge seed backdrop with sparse real bet data, amplify for visual impact
+function buildDisplayHistory(marketId, market) {
+  const base   = market.baseProbs || [50, 50];
+  const seed   = seedHistory(marketId, base);
+  const real   = marketHistories[marketId];
+
+  if (!real || real.length < 2) return seed;
+
+  // Use seed for first ~70% of the chart, real for the rest
+  const seedSlice = seed.slice(0, Math.ceil(seed.length * 0.70));
+
+  // Amplify real data: each real point is nudged away from the previous
+  // so tiny bet changes look like meaningful market moves
+  const amplified = [real[0]];
+  for (let i = 1; i < real.length; i++) {
+    const prev = amplified[i - 1];
+    const raw  = real[i];
+    const amp  = raw.map((v, oi) => {
+      const delta = v - prev[oi];
+      // Amplify delta by 3x but cap at 8 points per step
+      return prev[oi] + Math.max(-8, Math.min(8, delta * 3));
+    });
+    // Keep sum constant
+    const total = base.reduce((s, p) => s + p, 0);
+    const s     = amp.reduce((a, v) => a + v, 0);
+    amplified.push(amp.map(v => Math.max(1, (v / s) * total)));
+  }
+
+  // Smooth the real tail with a 3-point rolling average
+  const smoothed = amplified.map((snap, i) => {
+    if (i === 0 || i === amplified.length - 1) return snap;
+    return snap.map((v, oi) =>
+      (amplified[i - 1][oi] + v + amplified[i + 1][oi]) / 3
+    );
+  });
+
+  return [...seedSlice, ...smoothed];
+}
+
+// Step-line SVG path
 function stepPath(pts) {
   if (pts.length < 2) return '';
   let d = `M ${pts[0][0]},${pts[0][1]}`;
   for (let i = 1; i < pts.length; i++) {
-    const [x1, y1] = pts[i];
-    const [, y0] = pts[i - 1];
-    // Horizontal to new x at old y, then vertical to new y
-    d += ` H ${x1} V ${y1}`;
+    d += ` H ${pts[i][0]} V ${pts[i][1]}`;
   }
   return d;
 }
 
-function buildChart(history, options, probs, W, H, PAD, strokeW, dotR, showAll) {
+// Core chart SVG builder — enforces minimum visual range so lines never go flat
+function buildChart(history, options, W, H, PAD, strokeW, dotR, showAll) {
+  const isBinary = options.length === 2 && options[0] === 'YES' && options[1] === 'NO';
   const n = showAll ? Math.min(options.length, OPTION_COLORS.length)
-                    : (options.length === 2 && options[0] === 'YES' && options[1] === 'NO' ? 1
-                      : Math.min(options.length, OPTION_COLORS.length));
+                    : (isBinary ? 1 : Math.min(options.length, OPTION_COLORS.length));
 
   if (!history || history.length < 2) {
     return { n, svg: `<line x1="0" y1="${H/2}" x2="${W}" y2="${H/2}" stroke="#e5e7eb" stroke-width="1.5"/>` };
   }
 
-  const allVals = history.flatMap(snap =>
-    Array.isArray(snap) ? snap.slice(0, n) : [snap]
-  );
+  const allVals = history.flatMap(snap => snap.slice(0, n));
   const rawMin = Math.min(...allVals), rawMax = Math.max(...allVals);
-  const pad = Math.max(5, (rawMax - rawMin) * 0.15);
-  const minP = Math.max(0, rawMin - pad), maxP = Math.min(100, rawMax + pad);
+
+  // Enforce minimum 20% visual range so chart never looks flat
+  const midpoint  = (rawMin + rawMax) / 2;
+  const halfRange = Math.max(12, (rawMax - rawMin) / 2 + 4);
+  const minP = Math.max(0,   midpoint - halfRange);
+  const maxP = Math.min(100, midpoint + halfRange);
   const range = maxP - minP || 1;
 
   const toXY = (snap, i, oi) => {
     const x = PAD + (i / (history.length - 1)) * (W - 2 * PAD);
-    const prob = Array.isArray(snap) ? (snap[oi] ?? 0) : snap;
+    const prob = snap[oi] ?? 0;
     const y = H - PAD - ((prob - minP) / range) * (H - 2 * PAD);
     return [parseFloat(x.toFixed(1)), parseFloat(y.toFixed(1))];
   };
 
   let svg = '';
+  // Draw lines back-to-front so primary line is on top
+  for (let oi = n - 1; oi >= 0; oi--) {
+    const color = OPTION_COLORS[oi];
+    const pts   = history.map((snap, i) => toXY(snap, i, oi));
+    svg += `<path d="${stepPath(pts)}" fill="none" stroke="${color}" stroke-width="${strokeW}" stroke-linecap="square"/>`;
+  }
+  // Endpoint dots on top of all lines
   for (let oi = 0; oi < n; oi++) {
     const color = OPTION_COLORS[oi];
-    const pts = history.map((snap, i) => toXY(snap, i, oi));
-    const d = stepPath(pts);
-    const [ex, ey] = pts[pts.length - 1];
-    svg += `<path d="${d}" fill="none" stroke="${color}" stroke-width="${strokeW}" stroke-linecap="square"/>`;
-    svg += `<circle cx="${ex}" cy="${ey}" r="${dotR}" fill="${color}" stroke="#fff" stroke-width="1.5"/>`;
+    const last  = toXY(history[history.length - 1], history.length - 1, oi);
+    svg += `<circle cx="${last[0]}" cy="${last[1]}" r="${dotR}" fill="${color}" stroke="#fff" stroke-width="1.5"/>`;
   }
   return { n, svg };
 }
 
 function renderSparkline(history, options, probs) {
-  const W = 260, H = 90, PAD = 6;
-  const isBinary = options.length === 2 && options[0] === 'YES' && options[1] === 'NO';
-  const { n, svg } = buildChart(history, options, probs, W, H, PAD, 2, 4, false);
+  const W = 260, H = 95, PAD = 5;
+  const { n, svg } = buildChart(history, options, W, H, PAD, 2, 4, false);
 
-  // Legend: dot + name + bold %
   const legend = options.slice(0, n).map((opt, i) => {
     const p = Math.round(probs[i] || 0);
     return `<div class="market-chart-legend-row">
@@ -284,9 +341,7 @@ function getCurrentProbs(marketId, market) {
 }
 
 function getHistory(marketId, market) {
-  const hist = marketHistories[marketId];
-  if (hist && hist.length >= 2) return hist;
-  return seedHistory(marketId, market.baseProbs || [50, 50]);
+  return buildDisplayHistory(marketId, market);
 }
 
 function renderMarkets() {
@@ -331,7 +386,7 @@ function renderMarkets() {
 // ─── MODAL CHART ─────────────────────────────────────────────
 function renderModalChart(history, options, probs) {
   const W = 500, H = 220, PAD = 8;
-  const { n, svg } = buildChart(history, options, probs, W, H, PAD, 2.5, 6, true);
+  const { n, svg } = buildChart(history, options, W, H, PAD, 2.5, 6, true);
 
   // Legend: colored dot + name + bold %
   const legend = options.slice(0, n).map((opt, i) => {
