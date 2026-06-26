@@ -38,6 +38,23 @@ function showAdmin() {
   document.getElementById("admin-ui").classList.remove("hidden");
   subscribeToMarkets();
   subscribeToPlayers();
+
+  document.getElementById("clear-trades-btn").addEventListener("click", async () => {
+    if (!confirm("Clear all recent trades from the activity feed? This cannot be undone.")) return;
+    await remove(ref(db, "bets"));
+    showToast("All trades cleared.");
+  });
+
+  document.getElementById("reset-all-btn").addEventListener("click", async () => {
+    if (!confirm("Reset ALL player balances to $1,000?")) return;
+    const resetTime = Date.now();
+    const updates = { "config/balance_reset_at": resetTime };
+    Object.keys(allPlayers).forEach(id => {
+      updates[`users/${id}/balance`] = 1000;
+    });
+    await update(ref(db), updates);
+    showToast("All balances reset to $1,000.");
+  });
 }
 
 if (checkSession()) {
@@ -349,22 +366,6 @@ window.deleteUser = async function(userId, name) {
   showToast(`${name} deleted.`);
 };
 
-window.clearTrades = async function() {
-  if (!confirm("Clear all recent trades from the activity feed? This cannot be undone.")) return;
-  await remove(ref(db, "bets"));
-  showToast("All trades cleared.");
-};
-
-window.resetAllBalances = async function() {
-  if (!confirm("Reset ALL player balances to $1,000?")) return;
-  const resetTime = Date.now();
-  const updates = { "config/balance_reset_at": resetTime };
-  Object.keys(allPlayers).forEach(id => {
-    updates[`users/${id}/balance`] = 1000;
-  });
-  await update(ref(db), updates);
-  showToast("All balances reset to $1,000.");
-};
 
 // ─── STATUS / DELETE ──────────────────────────────────────────
 window.setStatus = async function(id, status) {
