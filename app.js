@@ -500,9 +500,13 @@ function getHistory(marketId, market) {
 function renderMarkets() {
   const grid = document.getElementById("markets-grid");
   const entries = Object.entries(allMarkets).sort((a, b) => {
-    // Open markets first, then closed, then resolved
     const order = { open: 0, closed: 1, resolved: 2 };
-    return (order[a[1].status] ?? 1) - (order[b[1].status] ?? 1);
+    const statusDiff = (order[a[1].status] ?? 1) - (order[b[1].status] ?? 1);
+    if (statusDiff !== 0) return statusDiff;
+    // Within closed/resolved groups: most recent first
+    const tsA = a[1].resolvedAt || a[1].closedAt || a[1].createdAt || 0;
+    const tsB = b[1].resolvedAt || b[1].closedAt || b[1].createdAt || 0;
+    return tsB - tsA;
   });
 
   if (entries.length === 0) {

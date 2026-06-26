@@ -456,7 +456,9 @@ window.resolveMarket = async function(id, winningIndex) {
 
 // ─── STATUS / DELETE ──────────────────────────────────────────
 window.setStatus = async function(id, status) {
-  await update(ref(db, `markets/${id}`), { status });
+  const updates = { status };
+  if (status === "closed") updates.closedAt = Date.now();
+  await update(ref(db, `markets/${id}`), updates);
   showToast(status === "open" ? "Market reopened." : "Market closed.");
 };
 
