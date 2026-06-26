@@ -394,14 +394,18 @@ function renderSparkline(history, options, probs) {
   // Card: every 4th point → ~15 anchors, smooth card curve
   const { n, svg } = buildChart(history, options, W, H, PAD, 2.2, 4, false, 4);
 
-  const legend = options.slice(0, n).map((opt, i) => {
-    const p = probs[i] || 0;
-    return `<div class="market-chart-legend-row">
+  // Show top 2 by probability so all cards have a consistent legend height
+  const allOpts = options.slice(0, n).map((opt, i) => ({ opt, i, p: probs[i] || 0 }));
+  const top2    = [...allOpts].sort((a, b) => b.p - a.p).slice(0, 2);
+  const extra   = n > 2 ? n - 2 : 0;
+
+  const legend = top2.map(({ opt, i, p }) =>
+    `<div class="market-chart-legend-row">
       <div class="legend-dot" style="background:${OPTION_COLORS[i]}"></div>
       <span class="legend-label">${opt}</span>
       <span class="legend-prob${p < 5 ? ' longshot' : ''}">${fmtProb(p)}</span>
-    </div>`;
-  }).join('');
+    </div>`
+  ).join('') + (extra ? `<div class="legend-more">+${extra} more</div>` : '');
 
   return `<div class="market-chart-legend">${legend}</div>
     <div class="market-sparkline"><svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none">${svg}</svg></div>`;
@@ -579,7 +583,10 @@ function renderMarkets() {
         </div>` : ""}
         ${chartHTML}
         <div class="market-footer">
-          <div class="market-vol">Vol: $${(m.volume || 0).toLocaleString()}</div>
+          <div class="market-vol">
+            Vol: $${(m.volume || 0).toLocaleString()}
+            ${isOpen && m.closeDate ? `<span class="market-close-time">· Closes ${fmtCloseDate(m.closeDate)}</span>` : ""}
+          </div>
           ${footerBtns}
         </div>
       </div>`;
@@ -664,6 +671,12 @@ window.openBetModal = function(marketId, optionIndex = 0) {
 
   document.getElementById("bet-modal-category").textContent = market.category || "";
   document.getElementById("bet-modal-market-title").textContent = market.title;
+  const closeDateEl = document.getElementById("bet-modal-close-date");
+  if (closeDateEl) {
+    const fmt = isOpen && market.closeDate ? `Closes ${fmtCloseDate(market.closeDate)}` : "";
+    closeDateEl.textContent = fmt;
+    closeDateEl.style.display = fmt ? "" : "none";
+  }
   document.getElementById("modal-chart-area").innerHTML = renderModalChart(history, options, probs);
 
   // Winner banner
@@ -694,6 +707,13 @@ window.openBetModal = function(marketId, optionIndex = 0) {
   document.getElementById("bet-overlay").classList.remove("hidden");
   updateBetModal();
 };
+
+function fmtCloseDate(str) {
+  if (!str) return null;
+  const d = new Date(str);
+  if (isNaN(d)) return null;
+  return d.toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
+}
 
 function fmtProb(p) {
   if (p < 1) return "<1%";

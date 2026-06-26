@@ -446,6 +446,12 @@ main {
   font-weight: 700;
   color: var(--text);
 }
+.legend-more {
+  font-size: 0.72rem;
+  color: var(--text-dim);
+  padding-left: 1rem;
+  line-height: 1.6;
+}
 
 .market-sparkline {
   height: 90px;
@@ -467,6 +473,15 @@ main {
 .market-vol {
   font-size: 0.75rem;
   color: var(--text-dim);
+}
+.market-close-time {
+  color: var(--text-dim);
+}
+
+.bet-modal-close-date {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  margin-top: -0.5rem;
 }
 .market-bet-btns { display: flex; gap: 0.5rem; }
 
