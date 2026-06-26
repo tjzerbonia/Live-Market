@@ -932,4 +932,44 @@ main {
   .header-inner { padding: 0.75rem 1rem; }
   main { padding: 1.5rem 1rem; }
   .markets-grid { grid-template-columns: 1fr; }
+
+  /* Bet modal — full-screen sheet on mobile */
+  .bet-modal {
+    max-width: 100%;
+    max-height: 95vh;
+    border-bottom-left-radius: 0;
+    border-bottom-right-radius: 0;
+    padding: 1rem 1rem 1.25rem;
+    margin-top: auto;
+    margin-bottom: 0;
+  }
+
+  /* Overlay aligns modal to bottom on mobile */
+  .overlay:has(.bet-modal) {
+    align-items: flex-end;
+  }
+
+  /* Shorter chart so controls aren't pushed off screen */
+  .modal-chart-svg,
+  .modal-chart-svg svg {
+    height: 140px;
+  }
+
+  /* Tighten up modal internals */
+  .bet-modal-market { font-size: 0.95rem; margin-bottom: 0.5rem; }
+  .modal-chart-area { margin-bottom: 0.5rem; }
+  .bet-options-row  { gap: 0.35rem; }
+  .bet-option-btn   { padding: 0.4rem 0.4rem; font-size: 0.75rem; min-width: 0; }
+  .modal-options-table { display: none; }
+
+  /* History panel full width */
+  .history-panel {
+    max-width: 100%;
+    max-height: 90vh;
+    border-bottom-left-radius: 0;
+    border-bottom-right-radius: 0;
+  }
+  .overlay:has(.history-panel) {
+    align-items: flex-end;
+  }
 }
