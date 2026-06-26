@@ -900,7 +900,9 @@ function subscribeToActivity() {
   onValue(ref(db, "bets"), (snap) => {
     const data = snap.val();
     if (!data) return;
-    cachedActivityBets = Object.values(data).sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
+    cachedActivityBets = Object.values(data)
+      .filter(b => !b.type)  // exclude admin adjustments and other non-trade records
+      .sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
     renderActivityFeed();
   });
 }
@@ -978,14 +980,16 @@ async function renderHistory() {
       cashflow    = `<span class="history-cf-loss">-$${bet.amount.toLocaleString()}</span>`;
     }
 
-    const title = (bet.marketTitle || "Unknown market").slice(0, 50);
+    const title  = (bet.marketTitle || "Unknown market").slice(0, 50);
+    const amount = (bet.amount ?? 0).toLocaleString();
+    const payout = (bet.payout ?? 0).toLocaleString();
     return `
       <div class="history-row">
         <div class="history-row-main">
           <span class="history-status-pill ${statusClass}">${statusText}</span>
           <div class="history-row-info">
             <div class="history-row-title">${title}</div>
-            <div class="history-row-detail">${bet.option} · $${bet.amount.toLocaleString()} bet · $${bet.payout.toLocaleString()} to win · ${timeAgo(bet.timestamp)}</div>
+            <div class="history-row-detail">${bet.option} · $${amount} bet · $${payout} to win · ${timeAgo(bet.timestamp)}</div>
           </div>
         </div>
         <div class="history-cf">${cashflow}</div>
