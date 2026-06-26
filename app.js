@@ -425,7 +425,6 @@ function updateBetModal() {
 
   document.getElementById("bet-odds-display").textContent =
     `${optionLabel} · ${Math.round(optionProb)}¢ per share`;
-  document.getElementById("bet-amount-input").value = activeBet.amount;
   document.getElementById("payout-amount").textContent = `$${payout}`;
 }
 
@@ -434,41 +433,57 @@ window.selectOption = function(i) {
   updateBetModal();
 };
 
-window.betStep = function() { return activeBet.step; };
-
-window.adjustAmount = function(delta) {
-  const maxBet = user.balance + 1000;
-  activeBet.amount = Math.max(1, Math.min(maxBet, activeBet.amount + delta));
-  updateBetModal();
-};
-
-window.setAmount = function(amount) {
+function applyAmount(amount) {
   const maxBet = user.balance + 1000;
   activeBet.amount = Math.max(1, Math.min(maxBet, amount));
-  updateBetModal();
-};
+  document.getElementById("bet-amount-input").value = activeBet.amount;
+  updatePayout();
+}
 
-window.onAmountInput = function(val) {
-  const n = parseInt(val, 10);
+function updatePayout() {
+  const market = allMarkets[activeBet.marketId];
+  if (!market) return;
+  const probs = getCurrentProbs(activeBet.marketId, market);
+  const optionProb = probs[activeBet.optionIndex] || 50;
+  const payout = Math.round(activeBet.amount / (optionProb / 100));
+  document.getElementById("payout-amount").textContent = `$${payout}`;
+}
+
+// Wire up +/- buttons
+document.getElementById("amount-dec").addEventListener("click", () => {
+  applyAmount(activeBet.amount - activeBet.step);
+});
+document.getElementById("amount-inc").addEventListener("click", () => {
+  applyAmount(activeBet.amount + activeBet.step);
+});
+
+// Wire up quick amount buttons
+document.getElementById("quick-amounts").addEventListener("click", (e) => {
+  const amt = parseInt(e.target.dataset.amt, 10);
+  if (!isNaN(amt)) applyAmount(amt);
+});
+
+// Wire up step buttons
+document.querySelector(".step-btns").addEventListener("click", (e) => {
+  const s = parseInt(e.target.dataset.step, 10);
+  if (isNaN(s)) return;
+  activeBet.step = s;
+  document.querySelectorAll(".step-btns button").forEach(b => {
+    b.classList.toggle("active", parseInt(b.dataset.step, 10) === s);
+  });
+});
+
+// Direct input
+document.getElementById("bet-amount-input").addEventListener("input", (e) => {
+  const n = parseInt(e.target.value, 10);
   if (!isNaN(n) && n >= 1) {
     const maxBet = user.balance + 1000;
     activeBet.amount = Math.min(maxBet, n);
-    // update payout without re-rendering the whole modal
-    const market   = allMarkets[activeBet.marketId];
-    const probs    = getCurrentProbs(activeBet.marketId, market);
-    const optionProb = probs[activeBet.optionIndex] || 50;
-    const payout   = Math.round(activeBet.amount / (optionProb / 100));
-    document.getElementById("payout-amount").textContent = `$${payout}`;
+    updatePayout();
   }
-};
+});
 
-window.setStep = function(s) {
-  activeBet.step = s;
-  [1, 5, 10, 25, 50].forEach(v => {
-    const el = document.getElementById(`step-${v}`);
-    if (el) el.classList.toggle("active", v === s);
-  });
-};
+window.onAmountInput = function() {}; // no-op, handled above
 
 document.getElementById("bet-close").addEventListener("click", () => {
   document.getElementById("bet-overlay").classList.add("hidden");
