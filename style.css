@@ -552,11 +552,28 @@ main {
   border-color: rgba(0,168,107,0.4);
   color: var(--yes);
 }
+.bet-option-btn.longshot {
+  opacity: 0.55;
+}
+.bet-option-btn.longshot.active {
+  opacity: 1;
+}
+.bet-option-prob {
+  font-size: 0.72rem;
+  font-weight: 400;
+}
 
-.bet-odds-display {
-  font-size: 0.8rem;
-  color: var(--text-muted);
-  text-align: center;
+/* Longshot treatment: dimmed but readable */
+.longshot .legend-prob,
+.legend-prob.longshot {
+  color: var(--text-dim);
+  font-style: italic;
+}
+.modal-option-row.longshot {
+  opacity: 0.55;
+}
+.modal-option-row.longshot .modal-option-name {
+  font-style: italic;
 }
 
 .bet-amount-row {
@@ -657,19 +674,28 @@ main {
   color: var(--accent);
 }
 
-.bet-payout-row {
+.bet-summary {
   display: flex;
-  justify-content: space-between;
   align-items: center;
-  font-size: 0.85rem;
-  color: var(--text-muted);
-  padding: 0.5rem 0;
-  border-top: 1px solid var(--border);
+  justify-content: space-between;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 0.65rem 0.875rem;
+  gap: 0.5rem;
 }
-.payout-amount {
-  font-size: 1rem;
+.bet-summary-text {
+  font-size: 0.875rem;
+  color: var(--text-muted);
+}
+.bet-summary-text strong {
+  color: var(--text);
+}
+.bet-summary-profit {
+  font-size: 0.8rem;
   font-weight: 700;
   color: var(--yes);
+  white-space: nowrap;
 }
 
 .submit-bet-btn {

@@ -345,11 +345,11 @@ function renderSparkline(history, options, probs) {
   const { n, svg } = buildChart(history, options, W, H, PAD, 2.2, 4, false, 4);
 
   const legend = options.slice(0, n).map((opt, i) => {
-    const p = Math.round(probs[i] || 0);
+    const p = probs[i] || 0;
     return `<div class="market-chart-legend-row">
       <div class="legend-dot" style="background:${OPTION_COLORS[i]}"></div>
       <span class="legend-label">${opt}</span>
-      <span class="legend-prob">${p}%</span>
+      <span class="legend-prob${p < 5 ? ' longshot' : ''}">${fmtProb(p)}</span>
     </div>`;
   }).join('');
 
@@ -510,28 +510,29 @@ function renderModalChart(history, options, probs) {
   // Modal: every 5th point → ~12 control points, clean readable curves
   const { n, svg } = buildChart(history, options, W, H, PAD, 2.5, 6, true, 5);
 
-  // Legend: colored dot + name + bold %
+  // Legend: colored dot + name + %
   const legend = options.slice(0, n).map((opt, i) => {
-    const p = Math.round(probs[i] || 0);
+    const p = probs[i] || 0;
     return `<div class="market-chart-legend-row">
       <div class="legend-dot" style="background:${OPTION_COLORS[i]}"></div>
       <span class="legend-label">${opt}</span>
-      <span class="legend-prob">${p}%</span>
+      <span class="legend-prob${p < 5 ? ' longshot' : ''}">${fmtProb(p)}</span>
     </div>`;
   }).join('');
 
-  // Options breakdown table: show each option's current probability
+  // Options breakdown table
   const isBinary = options.length === 2 && options[0] === 'YES' && options[1] === 'NO';
   const table = options.slice(0, n).map((opt, i) => {
-    const p   = Math.round(probs[i] || 0);
-    const noP = 100 - p;
-    return `<div class="modal-option-row">
+    const p    = probs[i] || 0;
+    const noP  = 100 - Math.round(p);
+    const dim  = p < 5 ? ' longshot' : '';
+    return `<div class="modal-option-row${dim}">
       <div class="modal-option-dot" style="background:${OPTION_COLORS[i]}"></div>
       <div class="modal-option-name">${opt}</div>
       <div class="modal-option-pills">
         ${isBinary
-          ? `<span class="modal-pill yes">${p}%</span><span class="modal-pill no">${noP}%</span>`
-          : `<span class="modal-pill yes">${p}%</span>`}
+          ? `<span class="modal-pill yes">${fmtProb(p)}</span><span class="modal-pill no">${fmtProb(noP)}</span>`
+          : `<span class="modal-pill yes">${fmtProb(p)}</span>`}
       </div>
     </div>`;
   }).join('');
@@ -564,6 +565,12 @@ window.openBetModal = function(marketId, optionIndex = 0) {
   updateBetModal();
 };
 
+function fmtProb(p) {
+  if (p < 1) return "<1%";
+  if (p > 99) return ">99%";
+  return `${Math.round(p)}%`;
+}
+
 function updateBetModal() {
   const market = allMarkets[activeBet.marketId];
   if (!market) return;
@@ -572,20 +579,22 @@ function updateBetModal() {
   const options = market.options || ["YES", "NO"];
 
   document.getElementById("bet-options-row").innerHTML = options.slice(0, 5).map((opt, i) => {
-    const p = Math.round(probs[i] || 0);
+    const p      = probs[i] || 0;
     const active = i === activeBet.optionIndex ? " active" : "";
-    return `<button class="bet-option-btn${active}" onclick="selectOption(${i})">
-      ${opt}<br><span style="font-size:.72rem;font-weight:400">${p}%</span>
+    const dim    = p < 5 ? " longshot" : "";
+    return `<button class="bet-option-btn${active}${dim}" onclick="selectOption(${i})">
+      ${opt}<br><span class="bet-option-prob">${fmtProb(p)}</span>
     </button>`;
   }).join("");
 
-  const optionProb  = probs[activeBet.optionIndex] || 50;
+  const rawProb    = Math.max(0.5, probs[activeBet.optionIndex] || 50);
   const optionLabel = options[activeBet.optionIndex] || "Option";
-  const payout = Math.round(activeBet.amount / (optionProb / 100));
+  const payout      = Math.round(activeBet.amount / (rawProb / 100));
+  const profit      = payout - activeBet.amount;
 
-  document.getElementById("bet-odds-display").textContent =
-    `${optionLabel} · ${Math.round(optionProb)}¢ per share`;
-  document.getElementById("payout-amount").textContent = `$${payout}`;
+  document.getElementById("bet-summary").innerHTML =
+    `<span class="bet-summary-text">Bet <strong>$${activeBet.amount}</strong> on <strong>${optionLabel}</strong> · win <strong>$${payout}</strong></span>` +
+    `<span class="bet-summary-profit">+$${profit} profit</span>`;
 }
 
 window.selectOption = function(i) {

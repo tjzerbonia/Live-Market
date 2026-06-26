@@ -74,9 +74,7 @@
       <div class="bet-options-row" id="bet-options-row">
         <!-- Populated by JS -->
       </div>
-      <div class="bet-odds-display" id="bet-odds-display"></div>
       <div class="bet-amount-row">
-        <label>Amount</label>
         <div class="amount-controls">
           <button id="amount-dec">-</button>
           <input type="number" id="bet-amount-input" min="1" value="10" oninput="onAmountInput(this.value)" />
@@ -100,10 +98,7 @@
           </div>
         </div>
       </div>
-      <div class="bet-payout-row">
-        <span>Potential payout</span>
-        <span class="payout-amount" id="payout-amount">$19</span>
-      </div>
+      <div class="bet-summary" id="bet-summary"></div>
       <button class="submit-bet-btn" id="submit-bet-btn" onclick="submitBet()">Place Trade</button>
     </div>
   </div>
