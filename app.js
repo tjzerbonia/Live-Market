@@ -387,8 +387,8 @@ function buildChart(history, options, W, H, PAD, strokeW, dotR, showAll, thinFac
   // 50% reference line — only when using fixed 0-100% scale
   if (fixedScale) {
     const y50 = H - PAD - ((50 - minP) / range) * (H - 2 * PAD);
-    svg += `<line x1="${PAD}" y1="${y50.toFixed(1)}" x2="${W - PAD}" y2="${y50.toFixed(1)}" stroke="#e5e7eb" stroke-width="1" stroke-dasharray="3,3"/>`;
-    svg += `<text x="${PAD + 2}" y="${(y50 - 2).toFixed(1)}" font-size="7" fill="#d1d5db" font-family="system-ui,sans-serif">50%</text>`;
+    svg += `<line x1="${PAD}" y1="${y50.toFixed(1)}" x2="${W - PAD}" y2="${y50.toFixed(1)}" stroke="#d1d5db" stroke-width="1" stroke-dasharray="4,3"/>`;
+    svg += `<text x="${PAD + 2}" y="${(y50 - 3).toFixed(1)}" font-size="8" fill="#9ca3af" font-family="system-ui,sans-serif" font-weight="500">50%</text>`;
   }
 
   for (let oi = n - 1; oi >= 0; oi--) {
