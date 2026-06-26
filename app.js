@@ -87,7 +87,15 @@ function onUserReady() {
   subscribeToUserBalance();
 }
 
-function registerUserInFirebase() {
+async function registerUserInFirebase() {
+  // Read Firebase balance first — never overwrite with a stale local value
+  const snap = await get(ref(db, `users/${user.id}/balance`));
+  const fbBalance = snap.val();
+  if (fbBalance != null && fbBalance > user.balance) {
+    user.balance = fbBalance;
+    localStorage.setItem("forecast_user", JSON.stringify(user));
+    updateBalanceDisplay();
+  }
   update(ref(db, `users/${user.id}`), {
     name: user.name,
     balance: user.balance,
@@ -364,11 +372,7 @@ function subscribeToUserBalance() {
 // ─── FIREBASE SUBSCRIPTIONS ──────────────────────────────────
 function subscribeToMarkets() {
   onValue(ref(db, "markets"), (snap) => {
-    const data = snap.val() || {};
-    allMarkets = {};
-    for (const [id, m] of Object.entries(data)) {
-      if (m.status !== "closed" && m.status !== "resolved") allMarkets[id] = m;
-    }
+    allMarkets = snap.val() || {};
     renderMarkets();
   });
 }
@@ -406,33 +410,53 @@ function getHistory(marketId, market) {
 
 function renderMarkets() {
   const grid = document.getElementById("markets-grid");
-  const entries = Object.entries(allMarkets);
+  const entries = Object.entries(allMarkets).sort((a, b) => {
+    // Open markets first, then closed, then resolved
+    const order = { open: 0, closed: 1, resolved: 2 };
+    return (order[a[1].status] ?? 1) - (order[b[1].status] ?? 1);
+  });
 
   if (entries.length === 0) {
-    grid.innerHTML = `<div style="color:var(--text-dim);font-size:.875rem;padding:2rem 0;">No open markets yet.</div>`;
+    grid.innerHTML = `<div style="color:var(--text-dim);font-size:.875rem;padding:2rem 0;">No markets yet.</div>`;
     return;
   }
 
   grid.innerHTML = entries.map(([id, m]) => {
-    const probs  = getCurrentProbs(id, m);
+    const isOpen     = m.status === "open";
+    const isResolved = m.status === "resolved";
+    const isClosed   = !isOpen;
+
+    const probs   = getCurrentProbs(id, m);
     const history = getHistory(id, m);
     const options = m.options || ["YES", "NO"];
     const isBinary = options.length === 2 && options[0] === "YES" && options[1] === "NO";
 
     const chartHTML = renderSparkline(history, options, probs);
 
-    const footerBtns = isBinary
-      ? `<div class="market-bet-btns" onclick="event.stopPropagation()">
-          <button class="bet-btn yes" onclick="openBetModal('${id}',0)">YES ${Math.round(probs[0])}¢</button>
-          <button class="bet-btn no"  onclick="openBetModal('${id}',1)">NO ${Math.round(probs[1])}¢</button>
+    // Status badge shown on non-open markets
+    const statusBadge = isClosed
+      ? `<div class="market-status-badge ${isResolved ? "resolved" : "closed"}">
+          ${isResolved ? `Resolved: ${m.resolvedOption}` : "Closed"}
         </div>`
-      : `<div class="market-bet-btns" onclick="event.stopPropagation()">
-          <button class="bet-btn trade" onclick="openBetModal('${id}',0)">Trade</button>
-        </div>`;
+      : "";
+
+    const footerBtns = isOpen
+      ? (isBinary
+          ? `<div class="market-bet-btns" onclick="event.stopPropagation()">
+              <button class="bet-btn yes" onclick="openBetModal('${id}',0)">YES ${Math.round(probs[0])}¢</button>
+              <button class="bet-btn no"  onclick="openBetModal('${id}',1)">NO ${Math.round(probs[1])}¢</button>
+            </div>`
+          : `<div class="market-bet-btns" onclick="event.stopPropagation()">
+              <button class="bet-btn trade" onclick="openBetModal('${id}',0)">Trade</button>
+            </div>`)
+      : `<div class="market-bet-btns"></div>`;
 
     return `
-      <div class="market-card" onclick="openBetModal('${id}',0)">
-        <div class="market-category">${m.category || "General"}</div>
+      <div class="market-card ${isClosed ? "market-card-closed" : ""}" ${isOpen ? `onclick="openBetModal('${id}',0)"` : ""}>
+        <div class="market-card-header">
+          <div class="market-category">${m.category || "General"}</div>
+          ${statusBadge}
+        </div>
         <div class="market-title">${m.title}</div>
         ${chartHTML}
         <div class="market-footer">

@@ -428,7 +428,7 @@ window.resolveMarket = async function(id, winningIndex) {
   const payouts = {};
   Object.values(allBets).forEach(bet => {
     if (bet.marketId !== id) return;
-    if (bet.optionIndex !== winningIndex) return;
+    if (Number(bet.optionIndex) !== winningIndex) return;
     payouts[bet.userId] = (payouts[bet.userId] || 0) + (bet.payout || 0);
   });
 
