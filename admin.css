@@ -144,6 +144,54 @@
   text-align: right;
 }
 
+.player-trades-btn {
+  background: none;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 0.3rem 0.65rem;
+  font-size: 0.75rem;
+  cursor: pointer;
+  color: var(--text-muted);
+  transition: all 0.15s;
+  white-space: nowrap;
+}
+.player-trades-btn:hover { background: var(--bg-hover); color: var(--text); }
+
+.player-trades-panel {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  margin: 0.25rem 0 0.5rem;
+  padding: 0.5rem 0.75rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+.player-trades-loading {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  padding: 0.25rem 0;
+}
+.player-trade-row {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  font-size: 0.78rem;
+}
+.player-trade-status {
+  font-size: 0.68rem;
+  font-weight: 600;
+  border-radius: 999px;
+  padding: 0.15rem 0.5rem;
+  flex-shrink: 0;
+}
+.trade-status-won  { background: rgba(0,168,107,0.1); color: #00a86b; }
+.trade-status-lost { background: rgba(229,57,53,0.1);  color: #e53935; }
+.trade-status-open { background: rgba(0,0,0,0.05);     color: var(--text-muted); }
+.player-trade-title  { flex: 1; color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.player-trade-option { color: var(--text-muted); flex-shrink: 0; }
+.player-trade-amt    { color: var(--text-muted); flex-shrink: 0; font-variant-numeric: tabular-nums; }
+
 .player-adjust-btn {
   background: none;
   border: 1px solid rgba(0,168,107,0.3);

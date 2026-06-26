@@ -362,6 +362,7 @@ function subscribeToPlayers() {
           <div class="player-name">${p.name || "Unknown"}</div>
           <div class="player-balance ${balClass}">$${bal.toLocaleString()}</div>
           <div class="player-seen">active ${seen}</div>
+          <button class="player-trades-btn" data-uid="${id}">Trades</button>
           <button class="player-adjust-btn" data-uid="${id}">Adjust</button>
           <button class="player-reset-btn" data-uid="${id}">Reset</button>
           <button class="player-delete-btn" data-uid="${id}">Delete</button>
@@ -369,6 +370,9 @@ function subscribeToPlayers() {
     }).join("");
 
     // Attach events after render to avoid onclick escaping issues
+    container.querySelectorAll(".player-trades-btn").forEach(btn => {
+      btn.addEventListener("click", () => showPlayerTrades(btn.dataset.uid));
+    });
     container.querySelectorAll(".player-adjust-btn").forEach(btn => {
       btn.addEventListener("click", () => showAdjustPicker(btn.dataset.uid));
     });
@@ -398,6 +402,49 @@ function timeAgo(ts) {
   if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
   if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
   return `${Math.floor(diff / 86400)}d ago`;
+}
+
+async function showPlayerTrades(userId) {
+  const existing = document.getElementById(`trades-panel-${userId}`);
+  if (existing) { existing.remove(); return; }
+
+  const panel = document.createElement("div");
+  panel.id = `trades-panel-${userId}`;
+  panel.className = "player-trades-panel";
+  panel.innerHTML = `<div class="player-trades-loading">Loading...</div>`;
+
+  const row = document.querySelector(`.admin-player-row[data-uid="${userId}"]`);
+  if (row) row.after(panel);
+
+  const snap = await get(ref(db, "bets"));
+  const allBets = snap.val() || {};
+
+  const bets = Object.values(allBets)
+    .filter(b => b.userId === userId && b.marketId)
+    .sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
+
+  if (bets.length === 0) {
+    panel.innerHTML = `<div class="player-trades-loading">No trades yet.</div>`;
+    return;
+  }
+
+  const rows = bets.map(b => {
+    const market = allMarkets[b.marketId];
+    const isResolved = market?.status === "resolved";
+    const won = isResolved && Number(market.resolvedOptionIndex) === Number(b.optionIndex);
+    const lost = isResolved && !won;
+    const statusClass = won ? "trade-status-won" : lost ? "trade-status-lost" : "trade-status-open";
+    const statusText  = won ? "Won" : lost ? "Lost" : "Open";
+    const title = (b.marketTitle || "Unknown").slice(0, 40);
+    return `<div class="player-trade-row">
+      <span class="player-trade-status ${statusClass}">${statusText}</span>
+      <span class="player-trade-title">${title}</span>
+      <span class="player-trade-option">${b.option || ""}</span>
+      <span class="player-trade-amt">$${(b.amount || 0).toLocaleString()}</span>
+    </div>`;
+  }).join("");
+
+  panel.innerHTML = rows;
 }
 
 function showAdjustPicker(userId) {
