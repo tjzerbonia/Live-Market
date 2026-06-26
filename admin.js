@@ -57,6 +57,8 @@ function showAdmin() {
   });
 }
 
+document.addEventListener("DOMContentLoaded", () => {
+
 if (checkSession()) {
   showAdmin();
 } else {
@@ -84,6 +86,8 @@ document.getElementById("logout-btn").addEventListener("click", () => {
   sessionStorage.removeItem(SESSION_KEY);
   location.reload();
 });
+
+}); // end DOMContentLoaded
 
 // ─── OPTION MANAGEMENT ────────────────────────────────────────
 window.addOption = function() {
