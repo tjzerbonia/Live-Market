@@ -4,7 +4,7 @@
 
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
 import {
-  getDatabase, ref, push, onValue, update, remove, set, get
+  getDatabase, ref, push, onValue, update, remove, get
 } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
 
 const ADMIN_PASSWORD = "forecast2025";
@@ -87,6 +87,12 @@ document.getElementById("logout-btn").addEventListener("click", () => {
   location.reload();
 });
 
+// Wire prob-sum listener on the initial static option rows in the HTML
+document.querySelectorAll("#options-list .opt-prob, #options-list .opt-name").forEach(inp => {
+  inp.addEventListener("input", updateProbSum);
+});
+updateProbSum();
+
 }); // end DOMContentLoaded
 
 // ─── OPTION MANAGEMENT ────────────────────────────────────────
@@ -131,11 +137,6 @@ function updateProbSum() {
   el.classList.toggle("invalid", Math.abs(sum - 100) > 1);
 }
 
-// Wire up initial inputs
-document.querySelectorAll(".opt-prob, .opt-name").forEach(inp => {
-  inp.addEventListener("input", updateProbSum);
-});
-
 // ─── FIREBASE SUBSCRIPTION ────────────────────────────────────
 function subscribeToMarkets() {
   onValue(ref(db, "markets"), (snap) => {
@@ -161,27 +162,33 @@ function renderMarketList() {
     entries = entries.filter(([, m]) => m.status === "open");
   } else if (currentFilter === "closed") {
     entries = entries.filter(([, m]) => m.status === "closed" || m.status === "resolved");
+  } else if (currentFilter === "archived") {
+    entries = entries.filter(([, m]) => m.status === "archived");
+  } else {
+    // "all" — exclude archived so they don't clutter the main view
+    entries = entries.filter(([, m]) => m.status !== "archived");
   }
   entries.sort((a, b) => (b[1].createdAt || 0) - (a[1].createdAt || 0));
 
   if (entries.length === 0) {
-    container.innerHTML = `<div class="list-empty">No ${currentFilter === "all" ? "" : currentFilter + " "}markets.</div>`;
+    container.innerHTML = `<div class="list-empty">No ${currentFilter} markets.</div>`;
     return;
   }
 
   container.innerHTML = entries.map(([id, m]) => {
     const isOpen     = m.status === "open";
     const isResolved = m.status === "resolved";
+    const isArchived = m.status === "archived";
     const options = m.options || ["YES", "NO"];
-    const statusLabel = isOpen ? "Open" : isResolved ? "Resolved" : "Closed";
-    const statusClass = isOpen ? "open" : isResolved ? "resolved" : "closed";
+    const statusLabel = isOpen ? "Open" : isResolved ? "Resolved" : isArchived ? "Archived" : "Closed";
+    const statusClass = isOpen ? "open" : isResolved ? "resolved" : isArchived ? "archived" : "closed";
     return `
       <div class="admin-market-row ${isOpen ? "" : "closed"}" data-id="${id}">
         <div>
           <div class="admin-market-meta">
             <span class="admin-market-category">${m.category || "General"}</span>
             <span class="market-status-pill ${statusClass}">${statusLabel}</span>
-            ${isResolved ? `<span class="resolved-winner-pill">Winner: ${m.resolvedOption}</span>` : ""}
+            ${isResolved || isArchived ? `<span class="resolved-winner-pill">Winner: ${m.resolvedOption}</span>` : ""}
           </div>
           <div class="admin-market-title">${m.title}</div>
           <div class="admin-market-stats">
@@ -191,10 +198,15 @@ function renderMarketList() {
           </div>
         </div>
         <div class="admin-market-actions">
-          ${!isResolved ? `<button class="admin-action-btn edit" onclick="startEdit('${id}')">Edit</button>` : ""}
+          ${isResolved
+            ? `<button class="admin-action-btn archive" onclick="archiveMarket('${id}')">Archive</button>`
+            : isArchived
+              ? `<button class="admin-action-btn reopen" onclick="setStatus('${id}','resolved')">Unarchive</button>`
+              : `<button class="admin-action-btn edit" onclick="startEdit('${id}')">Edit</button>`
+          }
           ${isOpen
             ? `<button class="admin-action-btn close-market" onclick="setStatus('${id}','closed')">Close</button>`
-            : !isResolved
+            : !isResolved && !isArchived
               ? `<button class="admin-action-btn reopen" onclick="setStatus('${id}','open')">Reopen</button>
                  <button class="admin-action-btn resolve" onclick="showResolveOptions('${id}')">Resolve</button>`
               : ""
@@ -204,6 +216,11 @@ function renderMarketList() {
       </div>`;
   }).join("");
 }
+
+window.archiveMarket = async function(id) {
+  await update(ref(db, `markets/${id}`), { status: "archived", archivedAt: Date.now() });
+  showToast("Market archived — hidden from players.");
+};
 
 // ─── CREATE / EDIT ────────────────────────────────────────────
 window.saveMarket = async function() {
@@ -449,10 +466,10 @@ async function adjustBalance(userId, delta, userName, log, note) {
 }
 
 window.resetUser = async function(userId) {
-  await Promise.all([
-    set(ref(db, `config/user_resets/${userId}`), Date.now()),
-    update(ref(db, `users/${userId}`), { balance: 1000 }),
-  ]);
+  await update(ref(db), {
+    [`config/user_resets/${userId}`]: Date.now(),
+    [`users/${userId}/balance`]: 1000,
+  });
   showToast("Balance reset to $1,000.");
 };
 

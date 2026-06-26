@@ -620,7 +620,11 @@
 .admin-action-btn.resolve { color: #6366f1; border-color: rgba(99,102,241,0.25); }
 .admin-action-btn.resolve:hover { background: rgba(99,102,241,0.07); }
 
+.admin-action-btn.archive { color: var(--text-muted); border-color: var(--border-accent); }
+.admin-action-btn.archive:hover { color: var(--text); background: var(--bg-hover); }
+
 .market-status-pill.resolved { background: rgba(99,102,241,0.1); color: #6366f1; }
+.market-status-pill.archived { background: var(--bg-hover); color: var(--text-dim); }
 
 .resolved-winner-pill {
   font-size: 0.65rem;

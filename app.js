@@ -176,6 +176,12 @@ function getInitials(name) {
   return name.split(" ").map(w => w[0]).join("").toUpperCase().slice(0, 2);
 }
 
+function escHtml(str) {
+  return String(str ?? "")
+    .replace(/&/g, "&amp;").replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+}
+
 function timeAgo(ts) {
   if (!ts) return "just now";
   const diff = Math.floor((Date.now() - ts) / 1000);
@@ -185,6 +191,13 @@ function timeAgo(ts) {
 }
 
 // ─── CHART ENGINE ─────────────────────────────────────────────
+// Shared normalizer — scales arr so its sum equals total
+function makeNormalize(total) {
+  return arr => {
+    const s = arr.reduce((a, v) => a + v, 0);
+    return arr.map(v => (v / s) * total);
+  };
+}
 
 function seedHistory(marketId, baseProbs, currentProbs) {
   let seed = 0;
@@ -195,10 +208,7 @@ function seedHistory(marketId, baseProbs, currentProbs) {
   };
 
   const total = baseProbs.reduce((s, p) => s + p, 0);
-  const normalize = arr => {
-    const s = arr.reduce((a, v) => a + v, 0);
-    return arr.map(v => (v / s) * total);
-  };
+  const normalize = makeNormalize(total);
 
   // Starting state — offset from base so there's somewhere to travel
   let state = normalize(baseProbs.map(p => Math.max(2, p + (rand() - 0.5) * 22)));
@@ -263,10 +273,7 @@ function seedHistory(marketId, baseProbs, currentProbs) {
 function expandRealData(real, base) {
   if (!real || real.length < 2) return null;
   const total = base.reduce((s, p) => s + p, 0);
-  const normalize = arr => {
-    const s = arr.reduce((a, v) => a + v, 0);
-    return arr.map(v => (v / s) * total);
-  };
+  const normalize = makeNormalize(total);
 
   const SUB = 8;
   const expanded = [];
@@ -288,10 +295,7 @@ function buildDisplayHistory(marketId, market) {
   const base    = toArray(market.baseProbs) || [50, 50];
   const current = getCurrentProbs(marketId, market);
   const total   = base.reduce((s, p) => s + p, 0);
-  const normalize = arr => {
-    const s = arr.reduce((a, v) => a + v, 0);
-    return arr.map(v => (v / s) * total);
-  };
+  const normalize = makeNormalize(total);
 
   const seed = seedHistory(marketId, base, current);
   const real = marketHistories[marketId];
@@ -447,15 +451,14 @@ function subscribeToUsers() {
 function subscribeToMarkets() {
   onValue(ref(db, "markets"), (snap) => {
     allMarkets = snap.val() || {};
-    renderMarkets();
+    scheduleRenderMarkets();
   });
 }
 
 function subscribeToMarketProbs() {
   onValue(ref(db, "market_probs"), (snap) => {
     marketCurrentProbs = snap.val() || {};
-    renderMarkets();
-    // Refresh modal % live if it's currently open for a market
+    scheduleRenderMarkets();
     if (activeBet.marketId &&
         !document.getElementById("bet-overlay").classList.contains("hidden")) {
       updateBetModal();
@@ -472,8 +475,15 @@ function subscribeToMarketHistories() {
         .sort((a, b) => (a.t || 0) - (b.t || 0))
         .map(e => e.probs);
     }
-    renderMarkets();
+    scheduleRenderMarkets();
   });
+}
+
+// Coalesce rapid simultaneous Firebase updates into a single render
+let _renderTimer = null;
+function scheduleRenderMarkets() {
+  clearTimeout(_renderTimer);
+  _renderTimer = setTimeout(renderMarkets, 30);
 }
 
 // ─── MARKET FILTER ───────────────────────────────────────────
@@ -503,13 +513,9 @@ function getCurrentProbs(marketId, market) {
   return toArray(market.baseProbs) || [50, 50];
 }
 
-function getHistory(marketId, market) {
-  return buildDisplayHistory(marketId, market);
-}
-
 function renderMarkets() {
   const grid = document.getElementById("markets-grid");
-  let entries = Object.entries(allMarkets);
+  let entries = Object.entries(allMarkets).filter(([, m]) => m.status !== "archived");
 
   if (marketFilter === "open") {
     entries = entries.filter(([, m]) => m.status === "open");
@@ -538,7 +544,7 @@ function renderMarkets() {
     const isClosed   = !isOpen;
 
     const probs   = getCurrentProbs(id, m);
-    const history = getHistory(id, m);
+    const history = buildDisplayHistory(id, m);
     const options = m.options || ["YES", "NO"];
     const isBinary = options.length === 2 && options[0] === "YES" && options[1] === "NO";
 
@@ -654,7 +660,7 @@ window.openBetModal = function(marketId, optionIndex = 0) {
   const isOpen  = market.status === "open";
   const options = market.options || ["YES", "NO"];
   const probs   = getCurrentProbs(marketId, market);
-  const history = getHistory(marketId, market);
+  const history = buildDisplayHistory(marketId, market);
 
   document.getElementById("bet-modal-category").textContent = market.category || "";
   document.getElementById("bet-modal-market-title").textContent = market.title;
@@ -788,8 +794,6 @@ document.getElementById("bet-amount-input").addEventListener("input", (e) => {
   updateBetSummary();
 });
 
-window.onAmountInput = function() {};
-
 document.getElementById("bet-close").addEventListener("click", () => {
   document.getElementById("bet-overlay").classList.add("hidden");
 });
@@ -882,14 +886,17 @@ function renderActivityFeed() {
     const avatarEl = betUserAvatar
       ? `<div class="activity-avatar has-image" style="background-image:url(${betUserAvatar})"></div>`
       : `<div class="activity-avatar">${getInitials(bet.userName || "?")}</div>`;
+    const safeName  = escHtml(bet.userName || "Anonymous");
+    const safeTitle = escHtml((bet.marketTitle || "a market").slice(0, 45));
+    const safeLabel = escHtml(label);
     return `
     <div class="activity-item" style="opacity:${opacity}">
       ${avatarEl}
       <div class="activity-text">
-        <strong>${bet.userName || "Anonymous"}</strong>
-        bet on <strong>${(bet.marketTitle || "a market").slice(0, 45)}${(bet.marketTitle?.length || 0) > 45 ? "…" : ""}</strong>
+        <strong>${safeName}</strong>
+        bet on <strong>${safeTitle}${(bet.marketTitle?.length || 0) > 45 ? "…" : ""}</strong>
       </div>
-      <div class="activity-side${isNo ? " no" : ""}">${label}</div>
+      <div class="activity-side${isNo ? " no" : ""}">${safeLabel}</div>
       <div class="activity-amount">$${bet.amount}</div>
       <div class="activity-time">${timeAgo(bet.timestamp)}</div>
     </div>`;
@@ -949,7 +956,7 @@ async function renderHistory() {
           <div class="history-row-main">
             <span class="history-status-pill history-status-admin">Admin</span>
             <div class="history-row-info">
-              <div class="history-row-title">${bet.note || "Balance adjustment"}</div>
+              <div class="history-row-title">${escHtml(bet.note || "Balance adjustment")}</div>
               <div class="history-row-detail">${timeAgo(bet.timestamp)}</div>
             </div>
           </div>
@@ -980,7 +987,7 @@ async function renderHistory() {
       cashflow    = `<span class="history-cf-loss">-$${bet.amount.toLocaleString()}</span>`;
     }
 
-    const title  = (bet.marketTitle || "Unknown market").slice(0, 50);
+    const title  = escHtml((bet.marketTitle || "Unknown market").slice(0, 50));
     const amount = (bet.amount ?? 0).toLocaleString();
     const payout = (bet.payout ?? 0).toLocaleString();
     return `
@@ -989,7 +996,7 @@ async function renderHistory() {
           <span class="history-status-pill ${statusClass}">${statusText}</span>
           <div class="history-row-info">
             <div class="history-row-title">${title}</div>
-            <div class="history-row-detail">${bet.option} · $${amount} bet · $${payout} to win · ${timeAgo(bet.timestamp)}</div>
+            <div class="history-row-detail">${escHtml(bet.option)} · $${amount} bet · $${payout} to win · ${timeAgo(bet.timestamp)}</div>
           </div>
         </div>
         <div class="history-cf">${cashflow}</div>
