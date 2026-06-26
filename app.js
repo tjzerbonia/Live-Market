@@ -727,7 +727,10 @@ window.openBetModal = function(marketId, optionIndex = 0) {
   const optionsRowEl  = document.getElementById("bet-options-row");
   if (tradeControls) tradeControls.style.display = (isOpen && !blocked) ? "" : "none";
   if (submitBtn)     submitBtn.style.display     = (isOpen && !blocked) ? "" : "none";
-  if (optionsRowEl)  optionsRowEl.style.display  = (isOpen && !blocked) ? "" : "none";
+  // Keep options row visible when blocked so avatars still show — just make buttons non-interactive
+  if (optionsRowEl)  optionsRowEl.style.display  = isOpen ? "" : "none";
+  if (optionsRowEl)  optionsRowEl.style.pointerEvents = blocked ? "none" : "";
+  if (optionsRowEl)  optionsRowEl.style.opacity       = blocked ? "0.6" : "";
   if (summaryEl && blocked) {
     summaryEl.innerHTML = `<span class="bet-summary-text bet-summary-closed">You're named in this market — trading restricted.</span>`;
   }
