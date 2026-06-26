@@ -347,7 +347,7 @@ function catmullRomPath(pts, tension = 0.35) {
 // Unique counter so each chart gets its own clipPath id (avoids global id conflicts)
 let _chartSeq = 0;
 
-function buildChart(history, options, W, H, PAD, strokeW, dotR, showAll, thinFactor) {
+function buildChart(history, options, W, H, PAD, strokeW, dotR, showAll, thinFactor, fixedScale = false) {
   const isBinary = options.length === 2 && options[0] === 'YES' && options[1] === 'NO';
   const n = showAll ? Math.min(options.length, OPTION_COLORS.length)
                     : (isBinary ? 1 : Math.min(options.length, OPTION_COLORS.length));
@@ -360,16 +360,18 @@ function buildChart(history, options, W, H, PAD, strokeW, dotR, showAll, thinFac
     ? history.filter((_, i) => i % thinFactor === 0 || i === history.length - 1)
     : history;
 
-  const allVals = pts_src.flatMap(snap => snap.slice(0, n));
-  const rawMin = Math.min(...allVals), rawMax = Math.max(...allVals);
-  const mid = (rawMin + rawMax) / 2;
-
-  // Scale tightly to the actual data — 6pt padding on each side.
-  // Clamp + clipPath prevents any spline from escaping the frame.
-  const dataHalf = (rawMax - rawMin) / 2;
-  const halfSpan = Math.max(6, dataHalf + 6);
-  const minP  = Math.max(0,   mid - halfSpan);
-  const maxP  = Math.min(100, mid + halfSpan);
+  let minP, maxP;
+  if (fixedScale) {
+    minP = 0; maxP = 100;
+  } else {
+    const allVals = pts_src.flatMap(snap => snap.slice(0, n));
+    const rawMin = Math.min(...allVals), rawMax = Math.max(...allVals);
+    const mid = (rawMin + rawMax) / 2;
+    const dataHalf = (rawMax - rawMin) / 2;
+    const halfSpan = Math.max(6, dataHalf + 6);
+    minP = Math.max(0,   mid - halfSpan);
+    maxP = Math.min(100, mid + halfSpan);
+  }
   const range = maxP - minP || 1;
 
   const toXY = (snap, i, oi) => {
@@ -381,6 +383,13 @@ function buildChart(history, options, W, H, PAD, strokeW, dotR, showAll, thinFac
 
   const clipId = `c${++_chartSeq}`;
   let svg = `<defs><clipPath id="${clipId}"><rect x="${PAD}" y="${PAD}" width="${W - 2*PAD}" height="${H - 2*PAD}"/></clipPath></defs>`;
+
+  // 50% reference line — only when using fixed 0-100% scale
+  if (fixedScale) {
+    const y50 = H - PAD - ((50 - minP) / range) * (H - 2 * PAD);
+    svg += `<line x1="${PAD}" y1="${y50.toFixed(1)}" x2="${W - PAD}" y2="${y50.toFixed(1)}" stroke="#e5e7eb" stroke-width="1" stroke-dasharray="3,3"/>`;
+    svg += `<text x="${PAD + 2}" y="${(y50 - 2).toFixed(1)}" font-size="7" fill="#d1d5db" font-family="system-ui,sans-serif">50%</text>`;
+  }
 
   for (let oi = n - 1; oi >= 0; oi--) {
     const color = OPTION_COLORS[oi];
@@ -403,8 +412,8 @@ function buildChart(history, options, W, H, PAD, strokeW, dotR, showAll, thinFac
 
 function renderSparkline(history, options, probs) {
   const W = 260, H = 95, PAD = 5;
-  // Card: every 4th point → ~15 anchors, smooth card curve
-  const { n, svg } = buildChart(history, options, W, H, PAD, 2.2, 4, false, 4);
+  // Card: fixed 0-100% scale so visual position reflects actual probability
+  const { n, svg } = buildChart(history, options, W, H, PAD, 2.2, 4, false, 4, true);
 
   // Show top 2 by probability so all cards have a consistent legend height
   const allOpts = options.slice(0, n).map((opt, i) => ({ opt, i, p: probs[i] || 0 }));
