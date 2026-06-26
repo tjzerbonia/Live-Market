@@ -598,16 +598,7 @@ function applyAmount(amount) {
   const maxBet = user.balance + 1000;
   activeBet.amount = Math.max(1, Math.min(maxBet, amount));
   document.getElementById("bet-amount-input").value = activeBet.amount;
-  updatePayout();
-}
-
-function updatePayout() {
-  const market = allMarkets[activeBet.marketId];
-  if (!market) return;
-  const probs = getCurrentProbs(activeBet.marketId, market);
-  const optionProb = probs[activeBet.optionIndex] || 50;
-  const payout = Math.round(activeBet.amount / (optionProb / 100));
-  document.getElementById("payout-amount").textContent = `$${payout}`;
+  updateBetModal();
 }
 
 // Wire up +/- buttons
@@ -640,7 +631,7 @@ document.getElementById("bet-amount-input").addEventListener("input", (e) => {
   if (!isNaN(n) && n >= 1) {
     const maxBet = user.balance + 1000;
     activeBet.amount = Math.min(maxBet, n);
-    updatePayout();
+    updateBetModal();
   }
 });
 
