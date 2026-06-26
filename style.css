@@ -269,6 +269,31 @@ main {
   100% { transform: scale(1);   opacity: 0; }
 }
 
+/* === Market Filter === */
+.market-filter-row {
+  display: flex;
+  gap: 0.4rem;
+  margin-bottom: 1.25rem;
+}
+
+.market-filter-btn {
+  background: none;
+  border: 1px solid var(--border-accent);
+  border-radius: var(--radius-pill);
+  color: var(--text-muted);
+  font-size: 0.78rem;
+  font-weight: 600;
+  padding: 0.3rem 0.875rem;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.market-filter-btn:hover { color: var(--text); border-color: var(--text-muted); }
+.market-filter-btn.active {
+  background: var(--text);
+  border-color: var(--text);
+  color: var(--bg-card);
+}
+
 /* === Markets Grid === */
 .markets-grid {
   display: grid;

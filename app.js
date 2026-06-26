@@ -27,6 +27,7 @@ let allMarkets = {};
 let marketCurrentProbs = {};  // { marketId: number[] }
 let marketHistories = {};     // { marketId: number[][] }
 let usersMap = {};            // { userId: { name, avatar, ... } }
+let marketFilter = "all";     // "all" | "open" | "resolved"
 
 // ─── SPARKLINE COLORS (one per option) ───────────────────────
 const OPTION_COLORS = ["#00a86b", "#5b7cfa", "#f59e0b", "#e879f9", "#e53935"];
@@ -475,6 +476,15 @@ function subscribeToMarketHistories() {
   });
 }
 
+// ─── MARKET FILTER ───────────────────────────────────────────
+window.setMarketFilter = function(filter) {
+  marketFilter = filter;
+  document.querySelectorAll(".market-filter-btn").forEach(btn => {
+    btn.classList.toggle("active", btn.dataset.filter === filter);
+  });
+  renderMarkets();
+};
+
 // ─── MARKET RENDERING ────────────────────────────────────────
 function toArray(val) {
   if (!val) return null;
@@ -499,7 +509,15 @@ function getHistory(marketId, market) {
 
 function renderMarkets() {
   const grid = document.getElementById("markets-grid");
-  const entries = Object.entries(allMarkets).sort((a, b) => {
+  let entries = Object.entries(allMarkets);
+
+  if (marketFilter === "open") {
+    entries = entries.filter(([, m]) => m.status === "open");
+  } else if (marketFilter === "resolved") {
+    entries = entries.filter(([, m]) => m.status === "resolved");
+  }
+
+  entries = entries.sort((a, b) => {
     const order = { open: 0, closed: 1, resolved: 2 };
     const statusDiff = (order[a[1].status] ?? 1) - (order[b[1].status] ?? 1);
     if (statusDiff !== 0) return statusDiff;
