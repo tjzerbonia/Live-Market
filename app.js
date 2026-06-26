@@ -439,6 +439,7 @@ function subscribeToUserBalance() {
 function subscribeToUsers() {
   onValue(ref(db, "users"), (snap) => {
     usersMap = snap.val() || {};
+    renderActivityFeed();
   });
 }
 
@@ -847,32 +848,38 @@ window.submitBet = async function() {
 };
 
 // ─── ACTIVITY FEED ───────────────────────────────────────────
+let cachedActivityBets = [];
+
+function renderActivityFeed() {
+  if (!cachedActivityBets.length) return;
+  document.getElementById("activity-feed").innerHTML = cachedActivityBets.slice(0, 10).map((bet, i) => {
+    const label = bet.option || bet.side || "YES";
+    const isNo  = label.toUpperCase() === "NO";
+    const opacity = i <= 6 ? 1 : Math.max(0.1, 1 - (i - 6) * 0.3);
+    const betUserAvatar = usersMap[bet.userId]?.avatar;
+    const avatarEl = betUserAvatar
+      ? `<div class="activity-avatar has-image" style="background-image:url(${betUserAvatar})"></div>`
+      : `<div class="activity-avatar">${getInitials(bet.userName || "?")}</div>`;
+    return `
+    <div class="activity-item" style="opacity:${opacity}">
+      ${avatarEl}
+      <div class="activity-text">
+        <strong>${bet.userName || "Anonymous"}</strong>
+        bet on <strong>${(bet.marketTitle || "a market").slice(0, 45)}${(bet.marketTitle?.length || 0) > 45 ? "…" : ""}</strong>
+      </div>
+      <div class="activity-side${isNo ? " no" : ""}">${label}</div>
+      <div class="activity-amount">$${bet.amount}</div>
+      <div class="activity-time">${timeAgo(bet.timestamp)}</div>
+    </div>`;
+  }).join("");
+}
+
 function subscribeToActivity() {
   onValue(ref(db, "bets"), (snap) => {
     const data = snap.val();
     if (!data) return;
-    const bets = Object.values(data).sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
-    document.getElementById("activity-feed").innerHTML = bets.slice(0, 10).map((bet, i) => {
-      const label = bet.option || bet.side || "YES";
-      const isNo  = label.toUpperCase() === "NO";
-      // Fade out the last 3 items
-      const opacity = i <= 6 ? 1 : Math.max(0.1, 1 - (i - 6) * 0.3);
-      const betUserAvatar = usersMap[bet.userId]?.avatar;
-      const avatarEl = betUserAvatar
-        ? `<div class="activity-avatar has-image" style="background-image:url(${betUserAvatar})"></div>`
-        : `<div class="activity-avatar">${getInitials(bet.userName || "?")}</div>`;
-      return `
-      <div class="activity-item" style="opacity:${opacity}">
-        ${avatarEl}
-        <div class="activity-text">
-          <strong>${bet.userName || "Anonymous"}</strong>
-          bet on <strong>${(bet.marketTitle || "a market").slice(0, 45)}${(bet.marketTitle?.length || 0) > 45 ? "…" : ""}</strong>
-        </div>
-        <div class="activity-side${isNo ? " no" : ""}">${label}</div>
-        <div class="activity-amount">$${bet.amount}</div>
-        <div class="activity-time">${timeAgo(bet.timestamp)}</div>
-      </div>`;
-    }).join("");
+    cachedActivityBets = Object.values(data).sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
+    renderActivityFeed();
   });
 }
 
