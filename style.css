@@ -933,36 +933,45 @@ main {
   main { padding: 1.5rem 1rem; }
   .markets-grid { grid-template-columns: 1fr; }
 
-  /* Bet modal — full-screen sheet on mobile */
+  /* Bet modal — bottom sheet */
   .bet-modal {
     max-width: 100%;
-    max-height: 95vh;
+    max-height: 92vh;
     border-bottom-left-radius: 0;
     border-bottom-right-radius: 0;
-    padding: 1rem 1rem 1.25rem;
+    padding: 1rem 1rem 1.5rem;
     margin-top: auto;
     margin-bottom: 0;
+    overflow-y: auto;
   }
-
-  /* Overlay aligns modal to bottom on mobile */
   .overlay:has(.bet-modal) {
     align-items: flex-end;
   }
 
-  /* Shorter chart so controls aren't pushed off screen */
+  /* Remove everything that adds height but no value on mobile */
+  .modal-options-table { display: none; }
+  .modal-chart-area .market-chart-legend { display: none; }
+  .modal-trade-divider { display: none; }
+
+  /* Compact chart */
+  .modal-chart-area {
+    padding: 0.5rem 0.5rem 0.25rem;
+    margin-bottom: 0.75rem;
+  }
   .modal-chart-svg,
   .modal-chart-svg svg {
-    height: 140px;
+    height: 110px;
   }
 
-  /* Tighten up modal internals */
-  .bet-modal-market { font-size: 0.95rem; margin-bottom: 0.5rem; }
-  .modal-chart-area { margin-bottom: 0.5rem; }
-  .bet-options-row  { gap: 0.35rem; }
-  .bet-option-btn   { padding: 0.4rem 0.4rem; font-size: 0.75rem; min-width: 0; }
-  .modal-options-table { display: none; }
+  /* Compact text */
+  .bet-modal-category { margin-bottom: 0.1rem; }
+  .bet-modal-market   { font-size: 0.9rem; margin-bottom: 0.6rem; }
 
-  /* History panel full width */
+  /* Option buttons */
+  .bet-options-row { gap: 0.3rem; margin-bottom: 0.75rem; }
+  .bet-option-btn  { padding: 0.5rem 0.3rem; font-size: 0.78rem; min-width: 0; }
+
+  /* History panel full width bottom sheet */
   .history-panel {
     max-width: 100%;
     max-height: 90vh;
