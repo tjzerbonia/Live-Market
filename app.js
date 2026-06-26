@@ -54,7 +54,8 @@ function resizeImage(file, size = 64) {
   });
 }
 
-let pendingAvatar = null; // base64 string set before submit
+let pendingAvatar = null;   // base64 string set before submit
+let _justRegistered = false; // true only during new account creation
 
 function initUser() {
   const stored = localStorage.getItem("forecast_user");
@@ -104,6 +105,7 @@ async function submitNickname() {
 
   user = { id: crypto.randomUUID(), name, balance: 1000, avatar: pendingAvatar || null };
   localStorage.setItem("forecast_user", JSON.stringify(user));
+  _justRegistered = true;
   document.getElementById("nickname-overlay").classList.add("hidden");
   onUserReady();
   btn.disabled = false;
@@ -131,6 +133,18 @@ function onUserReady() {
 }
 
 async function registerUserInFirebase() {
+  // For returning users (loaded from localStorage), verify they still exist in Firebase.
+  // If admin deleted them, clear local data and reload to show the nickname prompt.
+  if (!_justRegistered) {
+    const existSnap = await get(ref(db, `users/${user.id}`));
+    if (!existSnap.exists()) {
+      localStorage.removeItem("forecast_user");
+      location.reload();
+      return;
+    }
+  }
+  _justRegistered = false;
+
   // Read Firebase balance first — never overwrite with a stale local value
   const snap = await get(ref(db, `users/${user.id}/balance`));
   const fbBalance = snap.val();
