@@ -145,7 +145,19 @@ function onUserReady() {
   document.getElementById("avatar-update-input").addEventListener("change", async (e) => {
     const file = e.target.files[0];
     if (!file) return;
-    const newAvatar = await resizeImage(file, 64);
+    const resized = await resizeImage(file, 64);
+    const preview = document.getElementById("avatar-modal-preview");
+    preview.style.backgroundImage = `url(${resized})`;
+    preview.classList.add("has-image");
+    preview.dataset.pending = resized;
+    document.getElementById("avatar-modal-save").disabled = false;
+    e.target.value = "";
+  });
+
+  document.getElementById("avatar-modal-save").addEventListener("click", () => {
+    const preview = document.getElementById("avatar-modal-preview");
+    const newAvatar = preview.dataset.pending;
+    if (!newAvatar) return;
     user.avatar = newAvatar;
     localStorage.setItem("forecast_user", JSON.stringify(user));
     const el = document.getElementById("user-avatar");
@@ -154,7 +166,7 @@ function onUserReady() {
     el.classList.add("has-image");
     update(ref(db, `users/${user.id}`), { avatar: newAvatar });
     showToast("Photo updated!");
-    e.target.value = "";
+    closeAvatarModal();
   });
 }
 
@@ -997,6 +1009,27 @@ function subscribeToActivity() {
     renderActivityFeed();
   });
 }
+
+// ─── AVATAR MODAL ────────────────────────────────────────────
+window.openAvatarModal = function() {
+  const preview = document.getElementById("avatar-modal-preview");
+  // Seed preview with current avatar if one exists
+  if (user.avatar) {
+    preview.style.backgroundImage = `url(${user.avatar})`;
+    preview.classList.add("has-image");
+  } else {
+    preview.style.backgroundImage = "";
+    preview.classList.remove("has-image");
+    preview.textContent = getInitials(user.name);
+  }
+  delete preview.dataset.pending;
+  document.getElementById("avatar-modal-save").disabled = true;
+  document.getElementById("avatar-modal-overlay").classList.remove("hidden");
+};
+
+window.closeAvatarModal = function() {
+  document.getElementById("avatar-modal-overlay").classList.add("hidden");
+};
 
 // ─── TRADE HISTORY ───────────────────────────────────────────
 window.openHistory = function() {

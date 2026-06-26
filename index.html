@@ -38,11 +38,10 @@
           <span class="balance-label">Balance</span>
           <span class="balance-amount" id="user-balance">$1,000</span>
         </div>
-        <div class="user-pill" id="user-display" onclick="document.getElementById('avatar-update-input').click()" title="Click to update photo">
+        <div class="user-pill" id="user-display" onclick="openAvatarModal()" title="Update photo">
           <div class="user-avatar" id="user-avatar"></div>
           <span id="user-name-display">—</span>
         </div>
-        <input type="file" id="avatar-update-input" accept="image/*" style="display:none" />
       </div>
     </div>
   </header>
@@ -114,6 +113,21 @@
       </div>
       <div class="bet-summary" id="bet-summary"></div>
       <button class="submit-bet-btn" id="submit-bet-btn" onclick="submitBet()">Place Trade</button>
+    </div>
+  </div>
+
+  <!-- Avatar update modal -->
+  <div id="avatar-modal-overlay" class="overlay hidden" onclick="if(event.target===this)closeAvatarModal()">
+    <div class="modal">
+      <button class="modal-close" onclick="closeAvatarModal()">&#x2715;</button>
+      <h2>Update Photo</h2>
+      <p>Choose a new profile picture.</p>
+      <div class="avatar-upload-row">
+        <div class="avatar-preview" id="avatar-modal-preview"></div>
+        <label class="avatar-upload-btn" for="avatar-update-input">Choose photo</label>
+        <input type="file" id="avatar-update-input" accept="image/*" style="display:none" />
+      </div>
+      <button id="avatar-modal-save" disabled>Save Photo</button>
     </div>
   </div>
 
