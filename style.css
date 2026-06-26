@@ -933,42 +933,48 @@ main {
   main { padding: 1.5rem 1rem; }
   .markets-grid { grid-template-columns: 1fr; }
 
-  /* Bet modal — bottom sheet */
+  /* Bet modal — centered, compact */
   .bet-modal {
-    max-width: 100%;
+    max-width: 94vw;
     max-height: 92vh;
-    border-bottom-left-radius: 0;
-    border-bottom-right-radius: 0;
     padding: 1rem 1rem 1.5rem;
-    margin-top: auto;
-    margin-bottom: 0;
     overflow-y: auto;
   }
-  .overlay:has(.bet-modal) {
-    align-items: flex-end;
-  }
 
-  /* Remove everything that adds height but no value on mobile */
+  /* Remove only the redundant tall elements */
   .modal-options-table { display: none; }
-  .modal-chart-area .market-chart-legend { display: none; }
   .modal-trade-divider { display: none; }
 
-  /* Compact chart */
+  /* Compact legend — single row, smaller text */
+  .modal-chart-area .market-chart-legend {
+    flex-direction: row;
+    flex-wrap: wrap;
+    gap: 0.3rem 0.75rem;
+    margin-bottom: 0.4rem;
+  }
+  .modal-chart-area .market-chart-legend-row {
+    gap: 0.3rem;
+  }
+  .modal-chart-area .legend-label { font-size: 0.72rem; }
+  .modal-chart-area .legend-prob  { font-size: 0.72rem; }
+  .modal-chart-area .legend-dot   { width: 7px; height: 7px; }
+
+  /* Shorter chart */
   .modal-chart-area {
-    padding: 0.5rem 0.5rem 0.25rem;
-    margin-bottom: 0.75rem;
+    padding: 0.6rem 0.6rem 0.4rem;
+    margin-bottom: 0.6rem;
   }
   .modal-chart-svg,
   .modal-chart-svg svg {
-    height: 110px;
+    height: 120px;
   }
 
   /* Compact text */
   .bet-modal-category { margin-bottom: 0.1rem; }
-  .bet-modal-market   { font-size: 0.9rem; margin-bottom: 0.6rem; }
+  .bet-modal-market   { font-size: 0.9rem; margin-bottom: 0.5rem; }
 
   /* Option buttons */
-  .bet-options-row { gap: 0.3rem; margin-bottom: 0.75rem; }
+  .bet-options-row { gap: 0.3rem; margin-bottom: 0.6rem; }
   .bet-option-btn  { padding: 0.5rem 0.3rem; font-size: 0.78rem; min-width: 0; }
 
   /* History panel full width bottom sheet */
