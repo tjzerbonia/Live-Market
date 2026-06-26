@@ -182,16 +182,16 @@ function escHtml(str) {
     .replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 }
 
-// Insider trading guard — permissive: only exact whole-word match, 2+ char name tokens, binary markets only
+// Insider trading guard — exact whole-word match against title + option labels, any 2-option market
 function isInsiderBlocked(marketTitle, userName, options) {
-  const isBinary = options.length === 2 && options[0] === "YES" && options[1] === "NO";
-  if (!isBinary || !userName) return false;
-  const titleTokens = new Set(
-    marketTitle.toLowerCase().replace(/[^a-z0-9\s]/g, " ").split(/\s+/).filter(Boolean)
+  if (options.length !== 2 || !userName) return false;
+  // Search title AND option labels — covers both "Will TJ win?" and head-to-head options like ["TJ","AJ"]
+  const combined = [marketTitle, ...options].join(" ");
+  const searchTokens = new Set(
+    combined.toLowerCase().replace(/[^a-z0-9\s]/g, " ").split(/\s+/).filter(Boolean)
   );
-  // Split multi-word usernames and check each word >= 3 chars individually
   const nameTokens = userName.toLowerCase().replace(/[^a-z0-9\s]/g, " ").split(/\s+/).filter(t => t.length >= 2);
-  return nameTokens.length > 0 && nameTokens.some(nt => titleTokens.has(nt));
+  return nameTokens.length > 0 && nameTokens.some(nt => searchTokens.has(nt));
 }
 
 function timeAgo(ts) {
