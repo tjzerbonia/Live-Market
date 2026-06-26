@@ -563,8 +563,7 @@ window.openBetModal = function(marketId, optionIndex = 0) {
     if (market.status === "resolved" && market.resolvedOption) {
       bannerEl.className = "modal-winner-banner";
       bannerEl.innerHTML =
-        `<span class="modal-winner-trophy">🏆</span>` +
-        `<div class="modal-winner-text"><div class="modal-winner-label">Winner</div><div class="modal-winner-name">${market.resolvedOption}</div></div>`;
+        `<div class="modal-winner-label">Winner</div><div class="modal-winner-name">${market.resolvedOption}</div>`;
     } else {
       bannerEl.className = "hidden";
       bannerEl.innerHTML = "";
@@ -624,7 +623,7 @@ function updateBetSummary() {
   if (!isOpen) {
     const isResolved = market.status === "resolved";
     summaryEl.innerHTML = isResolved
-      ? `<span class="bet-summary-winner-icon">🏆</span><span class="bet-summary-text"><strong>${market.resolvedOption}</strong> won this market</span>`
+      ? `<span class="bet-summary-text"><strong>${market.resolvedOption}</strong> won this market</span>`
       : `<span class="bet-summary-text bet-summary-closed">Market closed — no new trades</span>`;
     return;
   }
