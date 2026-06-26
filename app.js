@@ -274,6 +274,9 @@ function catmullRomPath(pts, tension = 0.35) {
   return d;
 }
 
+// Unique counter so each chart gets its own clipPath id (avoids global id conflicts)
+let _chartSeq = 0;
+
 function buildChart(history, options, W, H, PAD, strokeW, dotR, showAll, thinFactor) {
   const isBinary = options.length === 2 && options[0] === 'YES' && options[1] === 'NO';
   const n = showAll ? Math.min(options.length, OPTION_COLORS.length)
@@ -283,7 +286,6 @@ function buildChart(history, options, W, H, PAD, strokeW, dotR, showAll, thinFac
     return { n, svg: `<line x1="0" y1="${H/2}" x2="${W}" y2="${H/2}" stroke="#e5e7eb" stroke-width="1.5"/>` };
   }
 
-  // Thin out points for cleaner curves (but never remove the last point)
   const pts_src = thinFactor > 1
     ? history.filter((_, i) => i % thinFactor === 0 || i === history.length - 1)
     : history;
@@ -291,40 +293,40 @@ function buildChart(history, options, W, H, PAD, strokeW, dotR, showAll, thinFac
   const allVals = pts_src.flatMap(snap => snap.slice(0, n));
   const rawMin = Math.min(...allVals), rawMax = Math.max(...allVals);
   const mid = (rawMin + rawMax) / 2;
-  // Always keep at least 20 pts of padding on each side so splines never clip
-  const halfSpan = Math.max(20, (rawMax - rawMin) / 2 + 8);
+
+  // Scale tightly to the actual data — 6pt padding on each side.
+  // Clamp + clipPath prevents any spline from escaping the frame.
+  const dataHalf = (rawMax - rawMin) / 2;
+  const halfSpan = Math.max(6, dataHalf + 6);
   const minP  = Math.max(0,   mid - halfSpan);
   const maxP  = Math.min(100, mid + halfSpan);
   const range = maxP - minP || 1;
 
   const toXY = (snap, i, oi) => {
-    const x = PAD + (i / (pts_src.length - 1)) * (W - 2 * PAD);
-    // Clamp Y to drawing area so spline overshoots are invisible
+    const x    = PAD + (i / (pts_src.length - 1)) * (W - 2 * PAD);
     const rawY = H - PAD - ((snap[oi] - minP) / range) * (H - 2 * PAD);
-    const y = Math.max(PAD, Math.min(H - PAD, rawY));
+    const y    = Math.max(PAD, Math.min(H - PAD, rawY));
     return [parseFloat(x.toFixed(1)), parseFloat(y.toFixed(1))];
   };
 
-  const clipId = `clip-${W}-${H}`;
+  const clipId = `c${++_chartSeq}`;
   let svg = `<defs><clipPath id="${clipId}"><rect x="${PAD}" y="${PAD}" width="${W - 2*PAD}" height="${H - 2*PAD}"/></clipPath></defs>`;
 
-  // Draw back-to-front so option 0 is always on top
   for (let oi = n - 1; oi >= 0; oi--) {
     const color = OPTION_COLORS[oi];
     const pts   = pts_src.map((snap, i) => toXY(snap, i, oi));
     svg += `<path d="${catmullRomPath(pts)}" fill="none" stroke="${color}" stroke-width="${strokeW}" stroke-linecap="round" stroke-linejoin="round" clip-path="url(#${clipId})"/>`;
   }
-  // Endpoint dots with pulsing ring animation
+
+  // Endpoint dots — drawn outside clipPath so rings are never cropped
   for (let oi = 0; oi < n; oi++) {
     const color = OPTION_COLORS[oi];
     const [ex, ey] = toXY(pts_src[pts_src.length - 1], pts_src.length - 1, oi);
-    const delay = (oi * 0.4).toFixed(1);
-    svg += `
-      <circle cx="${ex}" cy="${ey}" r="${dotR}" fill="${color}" opacity="0.25">
-        <animate attributeName="r" values="${dotR};${dotR * 2.8};${dotR}" dur="2s" begin="${delay}s" repeatCount="indefinite"/>
-        <animate attributeName="opacity" values="0.25;0;0.25" dur="2s" begin="${delay}s" repeatCount="indefinite"/>
-      </circle>
-      <circle cx="${ex}" cy="${ey}" r="${dotR}" fill="${color}" stroke="#fff" stroke-width="1.5"/>`;
+    const ringR    = dotR * 2.5;
+    const delayMs  = oi * 400;
+    // Outer pulsing ring uses CSS class; inner dot is solid
+    svg += `<circle class="chart-dot-ring" cx="${ex}" cy="${ey}" r="${ringR}" fill="${color}" style="transform-origin:${ex}px ${ey}px;animation-delay:${delayMs}ms"/>`;
+    svg += `<circle cx="${ex}" cy="${ey}" r="${dotR}" fill="${color}" stroke="#fff" stroke-width="1.5"/>`;
   }
   return { n, svg };
 }
@@ -684,11 +686,12 @@ window.submitBet = async function() {
     timestamp: serverTimestamp(),
   });
 
-  // Nudge probabilities
+  // Nudge probabilities — scales meaningfully with bet size
+  // $100 ≈ 3pts, $300 ≈ 7pts, $500 ≈ 10pts, $1000 ≈ 15pts (capped)
   await runTransaction(ref(db, `market_probs/${activeBet.marketId}`), (cur) => {
     const curArr = toArray(cur);
     let p = (curArr && curArr.length === options.length) ? [...curArr] : [...probs];
-    const weight = Math.min(activeBet.amount / 200, 2);
+    const weight = Math.min(activeBet.amount / 55, 15);
     const spread = weight / Math.max(p.length - 1, 1);
     p = p.map((v, i) =>
       i === activeBet.optionIndex ? v + weight : Math.max(1, v - spread)
