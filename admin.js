@@ -41,8 +41,16 @@ function showAdmin() {
 
   document.getElementById("clear-trades-btn").addEventListener("click", async () => {
     if (!confirm("Clear all recent trades from the activity feed? This cannot be undone.")) return;
-    await remove(ref(db, "bets"));
-    showToast("All trades cleared.");
+    const updates = {};
+    Object.keys(allMarkets).forEach(id => {
+      updates[`markets/${id}/volume`] = 0;
+    });
+    await Promise.all([
+      remove(ref(db, "bets")),
+      remove(ref(db, "market_history")),
+      update(ref(db), updates),
+    ]);
+    showToast("All trades cleared and volumes reset.");
   });
 
   document.getElementById("reset-all-btn").addEventListener("click", async () => {
