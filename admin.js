@@ -337,12 +337,16 @@ function subscribeToPlayers() {
           <div class="player-name">${p.name || "Unknown"}</div>
           <div class="player-balance ${balClass}">$${bal.toLocaleString()}</div>
           <div class="player-seen">active ${seen}</div>
+          <button class="player-adjust-btn" data-uid="${id}">Adjust</button>
           <button class="player-reset-btn" data-uid="${id}">Reset</button>
           <button class="player-delete-btn" data-uid="${id}">Delete</button>
         </div>`;
     }).join("");
 
     // Attach events after render to avoid onclick escaping issues
+    container.querySelectorAll(".player-adjust-btn").forEach(btn => {
+      btn.addEventListener("click", () => showAdjustPicker(btn.dataset.uid));
+    });
     container.querySelectorAll(".player-reset-btn").forEach(btn => {
       btn.addEventListener("click", () => resetUser(btn.dataset.uid));
     });
@@ -362,6 +366,86 @@ function timeAgo(ts) {
   if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
   if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
   return `${Math.floor(diff / 86400)}d ago`;
+}
+
+function showAdjustPicker(userId) {
+  // Toggle off if already open
+  const existing = document.getElementById(`adjust-picker-${userId}`);
+  if (existing) { existing.remove(); return; }
+
+  const picker = document.createElement("div");
+  picker.id = `adjust-picker-${userId}`;
+  picker.className = "balance-adjust-picker";
+  picker.innerHTML = `
+    <span class="adjust-picker-label">Adjust balance</span>
+    <div class="adjust-input-wrap">
+      <span class="adjust-input-dollar">$</span>
+      <input type="number" class="adjust-amount-input" placeholder="Amount" min="1" />
+    </div>
+    <button class="adjust-add-btn">+ Add</button>
+    <button class="adjust-sub-btn">− Subtract</button>
+    <button class="adjust-cancel-btn">Cancel</button>
+    <div class="adjust-log-row">
+      <label class="adjust-log-label">
+        <input type="checkbox" class="adjust-log-check" />
+        Show in player history
+      </label>
+      <input type="text" class="adjust-note-input hidden" placeholder="Reason (e.g. weekly bonus)" maxlength="80" />
+    </div>
+  `;
+
+  const row = document.querySelector(`.admin-player-row[data-uid="${userId}"]`);
+  const userName = row?.dataset.name || "Unknown";
+  if (row) row.after(picker);
+
+  const amtInput  = picker.querySelector(".adjust-amount-input");
+  const logCheck  = picker.querySelector(".adjust-log-check");
+  const noteInput = picker.querySelector(".adjust-note-input");
+
+  logCheck.addEventListener("change", () => {
+    noteInput.classList.toggle("hidden", !logCheck.checked);
+    if (logCheck.checked) noteInput.focus();
+  });
+
+  picker.querySelector(".adjust-cancel-btn").addEventListener("click", () => picker.remove());
+
+  picker.querySelector(".adjust-add-btn").addEventListener("click", () => {
+    const amt = parseInt(amtInput.value, 10);
+    if (!amt || amt < 1) { amtInput.focus(); return; }
+    adjustBalance(userId, amt, userName, logCheck.checked, noteInput.value.trim());
+    picker.remove();
+  });
+
+  picker.querySelector(".adjust-sub-btn").addEventListener("click", () => {
+    const amt = parseInt(amtInput.value, 10);
+    if (!amt || amt < 1) { amtInput.focus(); return; }
+    adjustBalance(userId, -amt, userName, logCheck.checked, noteInput.value.trim());
+    picker.remove();
+  });
+
+  amtInput.focus();
+}
+
+async function adjustBalance(userId, delta, userName, log, note) {
+  const snap = await get(ref(db, `users/${userId}/balance`));
+  const current = snap.val() ?? 1000;
+  const next = current + delta;
+  await update(ref(db, `users/${userId}`), { balance: next });
+
+  if (log) {
+    await push(ref(db, "bets"), {
+      userId,
+      userName,
+      type: "admin_adjustment",
+      delta,
+      note: note || (delta > 0 ? "Admin credit" : "Admin deduction"),
+      amount: Math.abs(delta),
+      timestamp: Date.now(),
+    });
+  }
+
+  const sign = delta > 0 ? "+" : "−";
+  showToast(`Balance ${sign}$${Math.abs(delta).toLocaleString()} → $${next.toLocaleString()}${log ? " · logged" : ""}`);
 }
 
 window.resetUser = async function(userId) {

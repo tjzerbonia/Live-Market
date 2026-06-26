@@ -936,6 +936,25 @@ async function renderHistory() {
   let totalWon = 0, totalLost = 0;
 
   const rows = myBets.map(bet => {
+    // Admin adjustment entry
+    if (bet.type === "admin_adjustment") {
+      const isCredit = bet.delta > 0;
+      const cashflow = isCredit
+        ? `<span class="history-cf-win">+$${Math.abs(bet.delta).toLocaleString()}</span>`
+        : `<span class="history-cf-loss">-$${Math.abs(bet.delta).toLocaleString()}</span>`;
+      return `
+        <div class="history-row">
+          <div class="history-row-main">
+            <span class="history-status-pill history-status-admin">Admin</span>
+            <div class="history-row-info">
+              <div class="history-row-title">${bet.note || "Balance adjustment"}</div>
+              <div class="history-row-detail">${timeAgo(bet.timestamp)}</div>
+            </div>
+          </div>
+          <div class="history-cf">${cashflow}</div>
+        </div>`;
+    }
+
     const market     = allMarkets[bet.marketId];
     const isResolved = market && market.status === "resolved";
     const won        = isResolved && Number(market.resolvedOptionIndex) === Number(bet.optionIndex);

@@ -1019,6 +1019,7 @@ main {
 .history-status-won    { background: var(--yes-dim); color: var(--yes); }
 .history-status-lost   { background: var(--no-dim);  color: var(--no); }
 .history-status-pending { background: var(--bg-hover); color: var(--text-muted); }
+.history-status-admin  { background: rgba(99,102,241,0.1); color: #6366f1; }
 
 .history-row-info {
   min-width: 0;
