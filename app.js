@@ -132,7 +132,7 @@ function timeAgo(ts) {
 
 // ─── CHART ENGINE ─────────────────────────────────────────────
 
-function seedHistory(marketId, baseProbs) {
+function seedHistory(marketId, baseProbs, currentProbs) {
   let seed = 0;
   for (let i = 0; i < marketId.length; i++) seed += marketId.charCodeAt(i) * (i + 1);
   const rand = () => {
@@ -146,12 +146,6 @@ function seedHistory(marketId, baseProbs) {
     return arr.map(v => (v / s) * total);
   };
 
-  // ── Checkpoint model ──────────────────────────────────────────
-  // Real markets look like: long plateau → sudden jump → new plateau.
-  // We generate 7 anchor states at irregular intervals.
-  // ~35% of transitions are meaningful moves; the rest are nearly flat.
-  // This gives the characteristic "step-function with smooth edges" look.
-
   // Starting state — offset from base so there's somewhere to travel
   let state = normalize(baseProbs.map(p => Math.max(2, p + (rand() - 0.5) * 22)));
 
@@ -159,28 +153,27 @@ function seedHistory(marketId, baseProbs) {
   const anchors = [{ t: 0, s: [...state] }];
 
   for (let a = 1; a < NUM_ANCHORS; a++) {
-    // Irregular spacing: each anchor is 8–20% of timeline after the previous
     const prevT = anchors[a - 1].t;
     const gap   = 0.08 + rand() * 0.12;
     const t     = Math.min(prevT + gap, 0.88);
 
     if (rand() < 0.35) {
-      // Meaningful event: one option moves 12–22 pts, others absorb
       const mover = Math.floor(rand() * baseProbs.length);
       const dir   = rand() > 0.45 ? 1 : -1;
       const mag   = (rand() * 10 + 12) * dir;
       const next  = state.map((v, i) => i === mover ? Math.max(2, v + mag) : v);
       state = normalize(next);
     } else {
-      // Quiet: tiny drift toward base (market is sitting still)
-      state = normalize(state.map((v, i) => v + (baseProbs[i] - v) * rand() * 0.07));
+      // Quiet drift — toward currentProbs so the narrative ends in the right place
+      state = normalize(state.map((v, i) => v + (currentProbs[i] - v) * rand() * 0.07));
     }
 
     anchors.push({ t, s: [...state] });
   }
 
-  // Final anchor: converge toward base probs
-  anchors.push({ t: 1.0, s: normalize(baseProbs) });
+  // Final anchor is always the actual current probability — the whole trailing
+  // curve converges here so there's no sudden snap at the endpoint.
+  anchors.push({ t: 1.0, s: normalize(currentProbs) });
 
   // ── Expand anchors → 60-point history ─────────────────────────
   // Between consecutive anchors interpolate with ease-in-out.
@@ -246,20 +239,19 @@ function buildDisplayHistory(marketId, market) {
     return arr.map(v => (v / s) * total);
   };
 
-  const seed = seedHistory(marketId, base);
+  const seed = seedHistory(marketId, base, current);
   const real = marketHistories[marketId];
   const expanded = expandRealData(real, base);
 
-  let history;
-  if (!expanded) {
-    history = seed;
-  } else {
-    const seedSlice = seed.slice(0, Math.ceil(seed.length * 0.72));
-    history = [...seedSlice, ...expanded];
-  }
+  if (!expanded) return seed;
 
-  // Always force the final point to the actual current probability so the
-  // endpoint dot is always accurate regardless of amplification drift.
+  // Seed covers the "history before bets" — real data covers the live portion.
+  // The seed already ends at currentProbs; real data also ends at currentProbs
+  // (from the last recorded bet snapshot), so the join is seamless.
+  const seedSlice = seed.slice(0, Math.ceil(seed.length * 0.72));
+  const history = [...seedSlice, ...expanded];
+
+  // Pin the very last point to current in case of any float drift
   history[history.length - 1] = normalize(current);
   return history;
 }
