@@ -579,100 +579,50 @@ main {
 .bet-amount-row {
   display: flex;
   flex-direction: column;
-  gap: 0.5rem;
-}
-.bet-amount-row label {
-  font-size: 0.8rem;
-  color: var(--text-muted);
-  font-weight: 500;
+  gap: 0.35rem;
 }
 
-.amount-controls {
+.bet-input-wrap {
   display: flex;
   align-items: center;
-  justify-content: space-between;
   background: var(--bg);
   border: 1px solid var(--border-accent);
   border-radius: var(--radius-sm);
-  overflow: hidden;
+  padding: 0 0.875rem;
+  transition: border-color 0.15s;
 }
-.amount-controls button {
-  background: none;
-  border: none;
-  color: var(--text-muted);
-  padding: 0.6rem 1rem;
-  cursor: pointer;
-  font-size: 1rem;
+.bet-input-wrap:focus-within {
+  border-color: var(--accent);
+}
+.bet-input-dollar {
+  font-size: 1.1rem;
   font-weight: 700;
-  transition: background 0.15s, color 0.15s;
-}
-.amount-controls button:hover {
-  background: var(--bg-hover);
-  color: var(--text);
+  color: var(--text-muted);
+  margin-right: 0.25rem;
+  user-select: none;
 }
 #bet-amount-input {
-  font-size: 1rem;
+  flex: 1;
+  font-size: 1.1rem;
   font-weight: 700;
   color: var(--text);
   background: none;
   border: none;
   outline: none;
-  text-align: center;
-  width: 70px;
+  padding: 0.65rem 0;
+  width: 100%;
   -moz-appearance: textfield;
 }
+#bet-amount-input::placeholder { color: var(--text-dim); font-weight: 400; }
 #bet-amount-input::-webkit-outer-spin-button,
 #bet-amount-input::-webkit-inner-spin-button { -webkit-appearance: none; }
 
-.step-row {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  margin-top: 0.25rem;
-}
-.step-row label {
+.bet-input-hint {
   font-size: 0.72rem;
   color: var(--text-dim);
-  white-space: nowrap;
+  min-height: 1rem;
 }
-.step-btns {
-  display: flex;
-  gap: 0.25rem;
-}
-.step-btns button {
-  background: var(--bg);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
-  color: var(--text-muted);
-  font-size: 0.72rem;
-  padding: 0.2rem 0.45rem;
-  cursor: pointer;
-  transition: all 0.15s;
-}
-.step-btns button:hover { border-color: var(--accent); color: var(--accent); }
-.step-btns button.active {
-  background: var(--accent-dim);
-  border-color: rgba(0,168,107,0.3);
-  color: var(--accent);
-  font-weight: 600;
-}
-
-.quick-amounts { display: flex; gap: 0.4rem; }
-.quick-amounts button {
-  flex: 1;
-  background: var(--bg);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
-  color: var(--text-muted);
-  font-size: 0.75rem;
-  padding: 0.3rem;
-  cursor: pointer;
-  transition: all 0.15s;
-}
-.quick-amounts button:hover {
-  border-color: var(--accent);
-  color: var(--accent);
-}
+.bet-input-hint.warn { color: var(--no); }
 
 .bet-summary {
   display: flex;
@@ -697,7 +647,8 @@ main {
   color: var(--yes);
   white-space: nowrap;
 }
-.bet-summary-closed {
+.bet-summary-closed,
+.bet-summary-empty {
   color: var(--text-dim);
   font-style: italic;
   font-size: 0.8rem;

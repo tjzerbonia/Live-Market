@@ -544,7 +544,7 @@ window.openBetModal = function(marketId, optionIndex = 0) {
 
   activeBet.marketId    = marketId;
   activeBet.optionIndex = optionIndex;
-  activeBet.amount      = 10;
+  activeBet.amount      = 0;
 
   const isOpen  = market.status === "open";
   const options = market.options || ["YES", "NO"];
@@ -560,6 +560,12 @@ window.openBetModal = function(marketId, optionIndex = 0) {
   const submitBtn     = document.getElementById("submit-bet-btn");
   tradeControls.style.display = isOpen ? "" : "none";
   submitBtn.style.display     = isOpen ? "" : "none";
+
+  // Reset input field and hint
+  const inputEl = document.getElementById("bet-amount-input");
+  const hintEl  = document.getElementById("bet-input-hint");
+  if (inputEl) { inputEl.value = ""; }
+  if (hintEl)  { hintEl.textContent = ""; hintEl.className = "bet-input-hint"; }
 
   document.getElementById("bet-overlay").classList.remove("hidden");
   updateBetModal();
@@ -604,14 +610,20 @@ function updateBetSummary() {
     return;
   }
 
-  const rawProb    = Math.max(0.5, probs[activeBet.optionIndex] || 50);
+  const rawProb     = Math.max(0.5, probs[activeBet.optionIndex] || 50);
   const optionLabel = options[activeBet.optionIndex] || "Option";
-  const payout      = Math.round(activeBet.amount / (rawProb / 100));
-  const profit      = payout - activeBet.amount;
+
+  if (!activeBet.amount || activeBet.amount < 1) {
+    summaryEl.innerHTML = `<span class="bet-summary-text bet-summary-empty">Enter an amount to see your payout</span>`;
+    return;
+  }
+
+  const payout = Math.round(activeBet.amount / (rawProb / 100));
+  const profit = payout - activeBet.amount;
 
   summaryEl.innerHTML =
-    `<span class="bet-summary-text">Bet <strong>$${activeBet.amount}</strong> on <strong>${optionLabel}</strong> · win <strong>$${payout}</strong></span>` +
-    `<span class="bet-summary-profit">+$${profit} profit</span>`;
+    `<span class="bet-summary-text">Bet <strong>$${activeBet.amount.toLocaleString()}</strong> on <strong>${optionLabel}</strong> · win <strong>$${payout.toLocaleString()}</strong></span>` +
+    `<span class="bet-summary-profit">+$${profit.toLocaleString()}</span>`;
 }
 
 function updateBetModal() {
@@ -625,48 +637,37 @@ window.selectOption = function(i) {
   updateBetSummary();
 };
 
-function applyAmount(amount) {
-  const maxBet = user.balance + 1000;
-  activeBet.amount = Math.max(1, Math.min(maxBet, amount));
-  document.getElementById("bet-amount-input").value = activeBet.amount;
-  updateBetSummary();
-}
-
-// Wire up +/- buttons
-document.getElementById("amount-dec").addEventListener("click", () => {
-  applyAmount(activeBet.amount - activeBet.step);
-});
-document.getElementById("amount-inc").addEventListener("click", () => {
-  applyAmount(activeBet.amount + activeBet.step);
-});
-
-// Wire up quick amount buttons
-document.getElementById("quick-amounts").addEventListener("click", (e) => {
-  const amt = parseInt(e.target.dataset.amt, 10);
-  if (!isNaN(amt)) applyAmount(amt);
-});
-
-// Wire up step buttons
-document.querySelector(".step-btns").addEventListener("click", (e) => {
-  const s = parseInt(e.target.dataset.step, 10);
-  if (isNaN(s)) return;
-  activeBet.step = s;
-  document.querySelectorAll(".step-btns button").forEach(b => {
-    b.classList.toggle("active", parseInt(b.dataset.step, 10) === s);
-  });
-});
-
-// Direct input
 document.getElementById("bet-amount-input").addEventListener("input", (e) => {
-  const n = parseInt(e.target.value, 10);
-  if (!isNaN(n) && n >= 1) {
-    const maxBet = user.balance + 1000;
-    activeBet.amount = Math.min(maxBet, n);
+  const n    = parseInt(e.target.value, 10);
+  const hint = document.getElementById("bet-input-hint");
+  const max  = user.balance + 1000;
+
+  if (!n || n < 1) {
+    activeBet.amount = 0;
+    hint.textContent = "";
     updateBetSummary();
+    return;
   }
+
+  if (n > max) {
+    activeBet.amount = max;
+    e.target.value   = max;
+    hint.textContent = `Max: $${max.toLocaleString()} (balance + $1,000 limit)`;
+    hint.className   = "bet-input-hint warn";
+  } else if (n > user.balance) {
+    activeBet.amount = n;
+    const deficit = n - user.balance;
+    hint.textContent = `Goes $${deficit} into the red`;
+    hint.className   = "bet-input-hint warn";
+  } else {
+    activeBet.amount = n;
+    hint.textContent = "";
+    hint.className   = "bet-input-hint";
+  }
+  updateBetSummary();
 });
 
-window.onAmountInput = function() {}; // no-op, handled above
+window.onAmountInput = function() {};
 
 document.getElementById("bet-close").addEventListener("click", () => {
   document.getElementById("bet-overlay").classList.add("hidden");
@@ -679,9 +680,12 @@ document.getElementById("bet-overlay").addEventListener("click", (e) => {
 // ─── SUBMIT BET ──────────────────────────────────────────────
 window.submitBet = async function() {
   if (!user.id) return;
-  // Sync amount from input field in case user typed directly
   const inputVal = parseInt(document.getElementById("bet-amount-input").value, 10);
   if (!isNaN(inputVal) && inputVal >= 1) activeBet.amount = inputVal;
+  if (!activeBet.amount || activeBet.amount < 1) {
+    document.getElementById("bet-amount-input").focus();
+    return;
+  }
 
   const btn = document.getElementById("submit-bet-btn");
   btn.disabled = true;
