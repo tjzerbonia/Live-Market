@@ -283,37 +283,48 @@ function buildChart(history, options, W, H, PAD, strokeW, dotR, showAll, thinFac
     return { n, svg: `<line x1="0" y1="${H/2}" x2="${W}" y2="${H/2}" stroke="#e5e7eb" stroke-width="1.5"/>` };
   }
 
-  // Optionally thin out points for card sparkline (less dense = cleaner curves)
+  // Thin out points for cleaner curves (but never remove the last point)
   const pts_src = thinFactor > 1
     ? history.filter((_, i) => i % thinFactor === 0 || i === history.length - 1)
     : history;
 
   const allVals = pts_src.flatMap(snap => snap.slice(0, n));
   const rawMin = Math.min(...allVals), rawMax = Math.max(...allVals);
-  const mid      = (rawMin + rawMax) / 2;
-  const halfSpan = Math.max(12, (rawMax - rawMin) / 2 + 4);
+  const mid = (rawMin + rawMax) / 2;
+  // Always keep at least 20 pts of padding on each side so splines never clip
+  const halfSpan = Math.max(20, (rawMax - rawMin) / 2 + 8);
   const minP  = Math.max(0,   mid - halfSpan);
   const maxP  = Math.min(100, mid + halfSpan);
   const range = maxP - minP || 1;
 
   const toXY = (snap, i, oi) => {
     const x = PAD + (i / (pts_src.length - 1)) * (W - 2 * PAD);
-    const y = H - PAD - ((snap[oi] - minP) / range) * (H - 2 * PAD);
+    // Clamp Y to drawing area so spline overshoots are invisible
+    const rawY = H - PAD - ((snap[oi] - minP) / range) * (H - 2 * PAD);
+    const y = Math.max(PAD, Math.min(H - PAD, rawY));
     return [parseFloat(x.toFixed(1)), parseFloat(y.toFixed(1))];
   };
 
-  let svg = '';
+  const clipId = `clip-${W}-${H}`;
+  let svg = `<defs><clipPath id="${clipId}"><rect x="${PAD}" y="${PAD}" width="${W - 2*PAD}" height="${H - 2*PAD}"/></clipPath></defs>`;
+
   // Draw back-to-front so option 0 is always on top
   for (let oi = n - 1; oi >= 0; oi--) {
     const color = OPTION_COLORS[oi];
     const pts   = pts_src.map((snap, i) => toXY(snap, i, oi));
-    svg += `<path d="${catmullRomPath(pts)}" fill="none" stroke="${color}" stroke-width="${strokeW}" stroke-linecap="round" stroke-linejoin="round"/>`;
+    svg += `<path d="${catmullRomPath(pts)}" fill="none" stroke="${color}" stroke-width="${strokeW}" stroke-linecap="round" stroke-linejoin="round" clip-path="url(#${clipId})"/>`;
   }
-  // Endpoint dots — always visible on top
+  // Endpoint dots with pulsing ring animation
   for (let oi = 0; oi < n; oi++) {
     const color = OPTION_COLORS[oi];
     const [ex, ey] = toXY(pts_src[pts_src.length - 1], pts_src.length - 1, oi);
-    svg += `<circle cx="${ex}" cy="${ey}" r="${dotR}" fill="${color}" stroke="#fff" stroke-width="2"/>`;
+    const delay = (oi * 0.4).toFixed(1);
+    svg += `
+      <circle cx="${ex}" cy="${ey}" r="${dotR}" fill="${color}" opacity="0.25">
+        <animate attributeName="r" values="${dotR};${dotR * 2.8};${dotR}" dur="2s" begin="${delay}s" repeatCount="indefinite"/>
+        <animate attributeName="opacity" values="0.25;0;0.25" dur="2s" begin="${delay}s" repeatCount="indefinite"/>
+      </circle>
+      <circle cx="${ex}" cy="${ey}" r="${dotR}" fill="${color}" stroke="#fff" stroke-width="1.5"/>`;
   }
   return { n, svg };
 }
@@ -381,6 +392,11 @@ function subscribeToMarketProbs() {
   onValue(ref(db, "market_probs"), (snap) => {
     marketCurrentProbs = snap.val() || {};
     renderMarkets();
+    // Refresh modal % live if it's currently open for a market
+    if (activeBet.marketId &&
+        !document.getElementById("bet-overlay").classList.contains("hidden")) {
+      updateBetModal();
+    }
   });
 }
 
@@ -398,10 +414,21 @@ function subscribeToMarketHistories() {
 }
 
 // ─── MARKET RENDERING ────────────────────────────────────────
+function toArray(val) {
+  if (!val) return null;
+  if (Array.isArray(val)) return val;
+  // Firebase sometimes returns {0: x, 1: y, ...} instead of [x, y, ...]
+  if (typeof val === 'object') {
+    const keys = Object.keys(val).map(Number).sort((a, b) => a - b);
+    if (keys.length > 0) return keys.map(k => val[k]);
+  }
+  return null;
+}
+
 function getCurrentProbs(marketId, market) {
-  const stored = marketCurrentProbs[marketId];
-  if (Array.isArray(stored) && stored.length > 0) return stored;
-  return market.baseProbs || [50, 50];
+  const stored = toArray(marketCurrentProbs[marketId]);
+  if (stored && stored.length > 0) return stored;
+  return toArray(market.baseProbs) || [50, 50];
 }
 
 function getHistory(marketId, market) {
@@ -483,17 +510,18 @@ function renderModalChart(history, options, probs) {
     </div>`;
   }).join('');
 
-  // Options breakdown table: each option row with YES% pill + NO% pill
+  // Options breakdown table: show each option's current probability
   const isBinary = options.length === 2 && options[0] === 'YES' && options[1] === 'NO';
   const table = options.slice(0, n).map((opt, i) => {
-    const yesP = Math.round(probs[i] || 0);
-    const noP  = 100 - yesP;
+    const p   = Math.round(probs[i] || 0);
+    const noP = 100 - p;
     return `<div class="modal-option-row">
       <div class="modal-option-dot" style="background:${OPTION_COLORS[i]}"></div>
       <div class="modal-option-name">${opt}</div>
       <div class="modal-option-pills">
-        <span class="modal-pill yes">${yesP}%</span>
-        <span class="modal-pill no">${noP}%</span>
+        ${isBinary
+          ? `<span class="modal-pill yes">${p}%</span><span class="modal-pill no">${noP}%</span>`
+          : `<span class="modal-pill yes">${p}%</span>`}
       </div>
     </div>`;
   }).join('');
@@ -658,7 +686,8 @@ window.submitBet = async function() {
 
   // Nudge probabilities
   await runTransaction(ref(db, `market_probs/${activeBet.marketId}`), (cur) => {
-    let p = Array.isArray(cur) && cur.length === options.length ? [...cur] : [...probs];
+    const curArr = toArray(cur);
+    let p = (curArr && curArr.length === options.length) ? [...curArr] : [...probs];
     const weight = Math.min(activeBet.amount / 200, 2);
     const spread = weight / Math.max(p.length - 1, 1);
     p = p.map((v, i) =>
