@@ -623,8 +623,8 @@ function renderMarkets() {
 // ─── MODAL CHART ─────────────────────────────────────────────
 function renderModalChart(history, options, probs) {
   const W = 500, H = 220, PAD = 8;
-  // Modal: every 5th point → ~12 control points, clean readable curves
-  const { n, svg } = buildChart(history, options, W, H, PAD, 2.5, 6, true, 5);
+  // Modal: fixed 0-100% scale so visual position reflects actual probability
+  const { n, svg } = buildChart(history, options, W, H, PAD, 2.5, 6, true, 5, true);
 
   // Legend: colored dot + name + %
   const legend = options.slice(0, n).map((opt, i) => {
