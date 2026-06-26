@@ -198,10 +198,10 @@ function renderMarketList() {
           </div>
         </div>
         <div class="admin-market-actions">
-          ${isResolved
-            ? `<button class="admin-action-btn archive" onclick="archiveMarket('${id}')">Archive</button>`
-            : isArchived
-              ? `<button class="admin-action-btn reopen" onclick="setStatus('${id}','resolved')">Unarchive</button>`
+          ${isArchived
+            ? `<button class="admin-action-btn reopen" onclick="setStatus('${id}','resolved')">Unarchive</button>`
+            : !isOpen
+              ? `<button class="admin-action-btn archive" onclick="archiveMarket('${id}')">Archive</button>`
               : `<button class="admin-action-btn edit" onclick="startEdit('${id}')">Edit</button>`
           }
           ${isOpen
