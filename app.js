@@ -26,11 +26,36 @@ let activeBet = { marketId: null, optionIndex: 0, amount: 10, step: 10 };
 let allMarkets = {};
 let marketCurrentProbs = {};  // { marketId: number[] }
 let marketHistories = {};     // { marketId: number[][] }
+let usersMap = {};            // { userId: { name, avatar, ... } }
 
 // ─── SPARKLINE COLORS (one per option) ───────────────────────
 const OPTION_COLORS = ["#00a86b", "#5b7cfa", "#f59e0b", "#e879f9", "#e53935"];
 
 // ─── NICKNAME SETUP ──────────────────────────────────────────
+// Resize an image file to a square thumbnail and return base64 JPEG
+function resizeImage(file, size = 64) {
+  return new Promise((resolve) => {
+    const img    = new Image();
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      img.onload = () => {
+        const canvas = document.createElement("canvas");
+        canvas.width = canvas.height = size;
+        const ctx = canvas.getContext("2d");
+        // Cover-crop: center the image
+        const scale = Math.max(size / img.width, size / img.height);
+        const w = img.width * scale, h = img.height * scale;
+        ctx.drawImage(img, (size - w) / 2, (size - h) / 2, w, h);
+        resolve(canvas.toDataURL("image/jpeg", 0.7));
+      };
+      img.src = e.target.result;
+    };
+    reader.readAsDataURL(file);
+  });
+}
+
+let pendingAvatar = null; // base64 string set before submit
+
 function initUser() {
   const stored = localStorage.getItem("forecast_user");
   if (stored) {
@@ -42,6 +67,16 @@ function initUser() {
       if (e.key === "Enter") submitNickname();
     });
     document.getElementById("nickname-submit").addEventListener("click", submitNickname);
+
+    // Avatar file picker
+    document.getElementById("avatar-file-input").addEventListener("change", async (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
+      pendingAvatar = await resizeImage(file, 64);
+      const preview = document.getElementById("avatar-preview");
+      preview.style.backgroundImage = `url(${pendingAvatar})`;
+      preview.classList.add("has-image");
+    });
   }
 }
 
@@ -67,7 +102,7 @@ async function submitNickname() {
     return;
   }
 
-  user = { id: crypto.randomUUID(), name, balance: 1000 };
+  user = { id: crypto.randomUUID(), name, balance: 1000, avatar: pendingAvatar || null };
   localStorage.setItem("forecast_user", JSON.stringify(user));
   document.getElementById("nickname-overlay").classList.add("hidden");
   onUserReady();
@@ -77,10 +112,18 @@ async function submitNickname() {
 
 function onUserReady() {
   document.getElementById("user-name-display").textContent = user.name;
+  const avatarEl = document.getElementById("user-avatar");
+  if (user.avatar) {
+    avatarEl.style.backgroundImage = `url(${user.avatar})`;
+    avatarEl.classList.add("has-image");
+  } else {
+    avatarEl.textContent = getInitials(user.name);
+  }
   updateBalanceDisplay();
   registerUserInFirebase();
   subscribeToMarkets();
   subscribeToActivity();
+  subscribeToUsers();
   subscribeToMarketProbs();
   subscribeToMarketHistories();
   subscribeToConfig();
@@ -96,11 +139,9 @@ async function registerUserInFirebase() {
     localStorage.setItem("forecast_user", JSON.stringify(user));
     updateBalanceDisplay();
   }
-  update(ref(db, `users/${user.id}`), {
-    name: user.name,
-    balance: user.balance,
-    lastSeen: Date.now(),
-  });
+  const updates = { name: user.name, balance: user.balance, lastSeen: Date.now() };
+  if (user.avatar) updates.avatar = user.avatar;
+  update(ref(db, `users/${user.id}`), updates);
 }
 
 // ─── UI HELPERS ──────────────────────────────────────────────
@@ -383,6 +424,12 @@ function subscribeToUserBalance() {
 }
 
 // ─── FIREBASE SUBSCRIPTIONS ──────────────────────────────────
+function subscribeToUsers() {
+  onValue(ref(db, "users"), (snap) => {
+    usersMap = snap.val() || {};
+  });
+}
+
 function subscribeToMarkets() {
   onValue(ref(db, "markets"), (snap) => {
     allMarkets = snap.val() || {};
@@ -798,9 +845,13 @@ function subscribeToActivity() {
       const isNo  = label.toUpperCase() === "NO";
       // Fade out the last 3 items
       const opacity = i <= 6 ? 1 : Math.max(0.1, 1 - (i - 6) * 0.3);
+      const betUserAvatar = usersMap[bet.userId]?.avatar;
+      const avatarEl = betUserAvatar
+        ? `<div class="activity-avatar has-image" style="background-image:url(${betUserAvatar})"></div>`
+        : `<div class="activity-avatar">${getInitials(bet.userName || "?")}</div>`;
       return `
       <div class="activity-item" style="opacity:${opacity}">
-        <div class="activity-avatar">${getInitials(bet.userName || "?")}</div>
+        ${avatarEl}
         <div class="activity-text">
           <strong>${bet.userName || "Anonymous"}</strong>
           bet on <strong>${(bet.marketTitle || "a market").slice(0, 45)}${(bet.marketTitle?.length || 0) > 45 ? "…" : ""}</strong>

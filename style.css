@@ -147,6 +147,81 @@ header {
   font-size: 0.8rem;
   color: var(--text-muted);
   cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+/* Header user avatar circle */
+.user-avatar {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: var(--accent-dim);
+  border: 1px solid rgba(0,168,107,0.25);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.6rem;
+  font-weight: 700;
+  color: var(--accent);
+  flex-shrink: 0;
+  background-size: cover;
+  background-position: center;
+  overflow: hidden;
+}
+.user-avatar.has-image { font-size: 0; }
+
+/* Avatar upload row in nickname modal */
+.avatar-upload-row {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.avatar-preview {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background: var(--bg-hover);
+  border: 2px dashed var(--border-accent);
+  flex-shrink: 0;
+  background-size: cover;
+  background-position: center;
+  transition: border-color 0.2s;
+}
+.avatar-preview.has-image {
+  border-style: solid;
+  border-color: var(--accent);
+}
+
+.avatar-upload-btn {
+  font-size: 0.85rem;
+  font-weight: 500;
+  color: var(--accent);
+  cursor: pointer;
+  border: 1px solid rgba(0,168,107,0.25);
+  border-radius: var(--radius-sm);
+  padding: 0.4rem 0.75rem;
+  background: var(--accent-dim);
+  transition: opacity 0.15s;
+  user-select: none;
+}
+.avatar-upload-btn:hover { opacity: 0.8; }
+
+.avatar-optional {
+  color: var(--text-dim);
+  font-weight: 400;
+  font-size: 0.78rem;
+}
+
+/* Activity feed avatar with image */
+.activity-avatar.has-image {
+  font-size: 0;
+  background-size: cover;
+  background-position: center;
+  background-color: transparent;
+  border-color: var(--border-accent);
 }
 
 /* === Main === */

@@ -17,6 +17,11 @@
       <h2>Welcome to Forecast</h2>
       <p>Pick a display name to start trading. No account needed.</p>
       <input type="text" id="nickname-input" placeholder="Your display name" maxlength="24" autocomplete="off" />
+      <div class="avatar-upload-row">
+        <div class="avatar-preview" id="avatar-preview"></div>
+        <label class="avatar-upload-btn" for="avatar-file-input">Add a photo <span class="avatar-optional">(optional)</span></label>
+        <input type="file" id="avatar-file-input" accept="image/*" style="display:none" />
+      </div>
       <div id="nickname-error" class="nickname-error hidden"></div>
       <button id="nickname-submit">Enter Markets</button>
     </div>
@@ -34,6 +39,7 @@
           <span class="balance-amount" id="user-balance">$1,000</span>
         </div>
         <div class="user-pill" id="user-display">
+          <div class="user-avatar" id="user-avatar"></div>
           <span id="user-name-display">—</span>
         </div>
       </div>
@@ -45,7 +51,7 @@
     <div class="page-header">
       <div>
         <h1>Markets</h1>
-        <p class="subtitle">Real-money feel, no real stakes. Trade your free balance.</p>
+        <p class="subtitle">Trade your Schmeckles today.</p>
       </div>
       <div class="live-badge">
         <span class="live-dot"></span> Live
