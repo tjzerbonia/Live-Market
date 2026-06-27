@@ -1265,65 +1265,6 @@ function renderLeaderboard() {
   }).join("");
 }
 
-// ─── MY POSITIONS ─────────────────────────────────────────────
-window.openPositions = function() {
-  document.getElementById("positions-overlay").classList.remove("hidden");
-  renderPositions();
-};
-
-window.closePositions = function() {
-  document.getElementById("positions-overlay").classList.add("hidden");
-};
-
-async function renderPositions() {
-  const listEl     = document.getElementById("positions-list");
-  const subtitleEl = document.getElementById("positions-subtitle");
-  listEl.innerHTML = `<div class="history-empty">Loading...</div>`;
-
-  const snap    = await get(ref(db, "bets"));
-  const allBets = snap.val() || {};
-
-  const myOpen = Object.values(allBets).filter(b => {
-    if (b.userId !== user.id) return false;
-    if (!b.marketId) return false;
-    const m = allMarkets[b.marketId];
-    return m && m.status !== "resolved" && !b.invalidated;
-  }).sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
-
-  if (myOpen.length === 0) {
-    listEl.innerHTML = `<div class="history-empty">No open positions.</div>`;
-    subtitleEl.textContent = "";
-    return;
-  }
-
-  subtitleEl.textContent = `${myOpen.length} open position${myOpen.length !== 1 ? "s" : ""}`;
-
-  listEl.innerHTML = myOpen.map(bet => {
-    const market = allMarkets[bet.marketId];
-    const probs  = getCurrentProbs(bet.marketId, market);
-    const optIdx = bet.optionIndex != null ? Number(bet.optionIndex) : 0;
-    const prob   = probs[optIdx] ?? 0;
-    const probFmt = fmtProb(prob);
-    const statusLabel = market.status === "closed" ? "Closed" : "Open";
-    const statusClass = market.status === "closed" ? "history-status-void" : "history-status-pending";
-
-    return `
-      <div class="history-row">
-        <div class="history-row-main">
-          <span class="history-status-pill ${statusClass}">${statusLabel}</span>
-          <div class="history-row-info">
-            <div class="history-row-title position-market">${escHtml((bet.marketTitle || "Unknown").slice(0, 50))}</div>
-            <div class="history-row-detail position-detail">
-              ${escHtml(bet.option)} ·
-              <span class="position-prob-pill">Current: ${probFmt}</span>
-              · $${(bet.amount || 0).toLocaleString()} bet · $${(bet.payout || 0).toLocaleString()} to win
-            </div>
-          </div>
-        </div>
-        <div class="history-cf"><span class="history-cf-neutral">-$${(bet.amount || 0).toLocaleString()}</span></div>
-      </div>`;
-  }).join("");
-}
 
 // ─── REACTIONS ────────────────────────────────────────────────
 function subscribeToReactions() {
