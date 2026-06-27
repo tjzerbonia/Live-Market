@@ -703,7 +703,12 @@ function renderMarkets() {
                   <button class="bet-btn no"  onclick="openBetModal('${id}',1)">NO ${Math.round(probs[1])}¢</button>
                 </div>`
               : `<div class="market-bet-btns" onclick="event.stopPropagation()">
-                  <button class="bet-btn trade" onclick="openBetModal('${id}',0)">Trade</button>
+                  ${options.slice(0, 3).map((opt, i) => {
+                    const c = Math.round(probs[i] || 0);
+                    const color = OPTION_COLORS[i];
+                    return `<button class="bet-btn multi-opt" style="color:${color};border-color:${color}20;background:${color}12" onclick="openBetModal('${id}',${i})">${opt} ${c}¢</button>`;
+                  }).join("")}
+                  ${options.length > 3 ? `<button class="bet-btn trade" onclick="openBetModal('${id}',0)">+${options.length - 3} more</button>` : ""}
                 </div>`))
       : `<div class="market-bet-btns"></div>`;
 
@@ -892,14 +897,13 @@ function updateBetOptions() {
     const active = i === activeBet.optionIndex ? " active" : "";
     const dim    = p < 5 ? " longshot" : "";
     const color  = OPTION_COLORS[i];
-    const cents  = p < 1 ? "<1¢" : p > 99 ? ">99¢" : `${Math.round(p)}¢`;
     const avatar = isHeadToHead
       ? `<div class="bet-option-avatar" style="background-image:url(${getAvatarForOption(opt)})"></div>`
       : "";
     return `<button class="bet-option-btn${active}${dim}${isHeadToHead ? " h2h" : ""}"
       style="--opt-color:${color}"
       ${isOpen ? `onclick="selectOption(${i})"` : "disabled"}>
-      ${avatar}${opt}<br><span class="bet-option-prob">${cents}</span>
+      ${avatar}${opt}<br><span class="bet-option-prob">${fmtProb(p)}</span>
     </button>`;
   }).join("");
 }
