@@ -1334,7 +1334,8 @@ function subscribeToReactions() {
 }
 
 window.toggleReaction = async function(betKey, emoji) {
-  if (!user.id) return;
+  showToast(`Reaction: ${emoji} on ${betKey.slice(-4)}`);
+  if (!user.id) { showToast("No user — reaction blocked"); return; }
   const path = ref(db, `reactions/${betKey}/${emoji}/${user.id}`);
   const snap = await get(path);
   if (snap.exists()) {
