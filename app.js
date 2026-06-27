@@ -891,11 +891,14 @@ function updateBetOptions() {
     const p      = probs[i] || 0;
     const active = i === activeBet.optionIndex ? " active" : "";
     const dim    = p < 5 ? " longshot" : "";
+    const color  = OPTION_COLORS[i];
+    const cents  = p < 1 ? "<1¢" : p > 99 ? ">99¢" : `${Math.round(p)}¢`;
     const avatar = isHeadToHead
       ? `<div class="bet-option-avatar" style="background-image:url(${getAvatarForOption(opt)})"></div>`
       : "";
-    const cents = p < 1 ? "<1¢" : p > 99 ? ">99¢" : `${Math.round(p)}¢`;
-    return `<button class="bet-option-btn${active}${dim}${isHeadToHead ? " h2h" : ""}" ${isOpen ? `onclick="selectOption(${i})"` : "disabled"}>
+    return `<button class="bet-option-btn${active}${dim}${isHeadToHead ? " h2h" : ""}"
+      style="--opt-color:${color}"
+      ${isOpen ? `onclick="selectOption(${i})"` : "disabled"}>
       ${avatar}${opt}<br><span class="bet-option-prob">${cents}</span>
     </button>`;
   }).join("");
