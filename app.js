@@ -581,9 +581,15 @@ function renderMarkets() {
   }
 
   entries = entries.sort((a, b) => {
-    const order = { open: 0, closed: 1, resolved: 2 };
-    const statusDiff = (order[a[1].status] ?? 1) - (order[b[1].status] ?? 1);
+    const statusOrder = { open: 0, closed: 1, resolved: 2 };
+    const statusDiff = (statusOrder[a[1].status] ?? 1) - (statusOrder[b[1].status] ?? 1);
     if (statusDiff !== 0) return statusDiff;
+    // Open markets: sort by admin-defined order field
+    if (a[1].status === "open") {
+      const ao = a[1].order != null ? a[1].order : (a[1].createdAt ?? 0);
+      const bo = b[1].order != null ? b[1].order : (b[1].createdAt ?? 0);
+      return ao - bo;
+    }
     // Within closed/resolved groups: most recent first
     const tsA = a[1].resolvedAt || a[1].closedAt || a[1].createdAt || 0;
     const tsB = b[1].resolvedAt || b[1].closedAt || b[1].createdAt || 0;

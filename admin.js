@@ -177,8 +177,8 @@ function renderMarketList() {
     entries = entries.filter(([, m]) => m.status !== "archived");
   }
   entries.sort((a, b) => {
-    const ao = a[1].order ?? a[1].createdAt ?? 0;
-    const bo = b[1].order ?? b[1].createdAt ?? 0;
+    const ao = a[1].order != null ? a[1].order : (a[1].createdAt ?? 0);
+    const bo = b[1].order != null ? b[1].order : (b[1].createdAt ?? 0);
     return ao - bo;
   });
 
