@@ -29,8 +29,7 @@ let marketHistories = {};     // { marketId: number[][] }
 let usersMap = {};            // { userId: { name, avatar, ... } }
 let marketFilter = "all";     // "all" | "open" | "resolved"
 let categoryFilter = "all";  // "all" | <category string>
-let allReactions = {};        // { marketId: { emoji: { userId: true } } }
-let bigBetThreshold = 200;   // pulled from /config/big_bet_threshold
+let allReactions = {};        // { betKey: { emojiKey: { userId: true } } }
 
 // ─── SPARKLINE COLORS (one per option) ───────────────────────
 const OPTION_COLORS = ["#00a86b", "#5b7cfa", "#f59e0b", "#e879f9", "#e53935"];
@@ -145,7 +144,6 @@ function onUserReady() {
   subscribeToConfig();
   subscribeToUserBalance();
   subscribeToReactions();
-  subscribeToAlertConfig();
 
   // Auto-close markets whose closeDate has passed (runs every 60s)
   setInterval(() => {
@@ -1028,19 +1026,6 @@ window.submitBet = async function() {
     timestamp: serverTimestamp(),
   });
 
-  // Big bet alert
-  if (activeBet.amount >= bigBetThreshold) {
-    push(ref(db, "alerts"), {
-      type: "big_bet",
-      userId: user.id,
-      userName: user.name,
-      marketId: activeBet.marketId,
-      marketTitle: market.title,
-      option: optionLabel,
-      amount: activeBet.amount,
-      timestamp: Date.now(),
-    });
-  }
 
   // Nudge probabilities — scales meaningfully with bet size
   // $100 ≈ 3pts, $300 ≈ 7pts, $500 ≈ 10pts, $1000 ≈ 15pts (capped)
@@ -1099,7 +1084,10 @@ function renderActivityFeed() {
       const reacted = user.id && !!emojiReactions[user.id];
       return `<button class="reaction-btn${reacted ? " reacted" : ""}" data-rkey="${key}" data-ei="${ei}">${emoji}${count > 0 ? `<span class="reaction-count">${count}</span>` : ""}</button>`;
     }).join("");
-    const reactionRow = `<div class="activity-reactions">${reactionBtns}</div>`;
+    const hasAnyReaction = REACTION_EMOJIS.some(({ key: rkey }) =>
+      Object.keys((allReactions[key]?.[rkey]) || {}).length > 0
+    );
+    const reactionRow = `<div class="activity-reactions${hasAnyReaction ? " has-reactions" : ""}">${reactionBtns}</div>`;
 
     return `
     <div class="activity-item" style="opacity:${opacity}">
@@ -1364,13 +1352,6 @@ window.toggleReaction = async function(betKey, emoji) {
   }
 };
 
-// ─── ALERT CONFIG ─────────────────────────────────────────────
-function subscribeToAlertConfig() {
-  onValue(ref(db, "config/big_bet_threshold"), (snap) => {
-    const val = snap.val();
-    if (val != null) bigBetThreshold = val;
-  });
-}
 
 // ─── INIT ─────────────────────────────────────────────────────
 initUser();
