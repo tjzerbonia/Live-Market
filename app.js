@@ -27,7 +27,7 @@ let allMarkets = {};
 let marketCurrentProbs = {};  // { marketId: number[] }
 let marketHistories = {};     // { marketId: number[][] }
 let usersMap = {};            // { userId: { name, avatar, ... } }
-let marketFilter = "all";     // "all" | "open" | "resolved"
+let marketFilter = "open";     // "all" | "open" | "resolved"
 let categoryFilter = "all";  // "all" | <category string>
 let allReactions = {};        // { betKey: { emojiKey: { userId: true } } }
 
