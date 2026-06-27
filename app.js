@@ -209,16 +209,21 @@ function escHtml(str) {
     .replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 }
 
-// Insider trading guard — exact whole-word match against title + option labels, any 2-option market
+// Insider trading guard — any 2-option market
+// Title words: exact match only
+// Option labels: exact match OR option is a prefix of the username token (e.g. "Nick" → "NickMoney")
 function isInsiderBlocked(marketTitle, userName, options) {
   if (options.length !== 2 || !userName) return false;
-  // Search title AND option labels — covers both "Will TJ win?" and head-to-head options like ["TJ","AJ"]
-  const combined = [marketTitle, ...options].join(" ");
-  const searchTokens = new Set(
-    combined.toLowerCase().replace(/[^a-z0-9\s]/g, " ").split(/\s+/).filter(Boolean)
+  const titleTokens = new Set(
+    marketTitle.toLowerCase().replace(/[^a-z0-9\s]/g, " ").split(/\s+/).filter(Boolean)
   );
+  const optionTokens = options
+    .join(" ").toLowerCase().replace(/[^a-z0-9\s]/g, " ").split(/\s+/).filter(t => t.length >= 2);
   const nameTokens = userName.toLowerCase().replace(/[^a-z0-9\s]/g, " ").split(/\s+/).filter(t => t.length >= 2);
-  return nameTokens.length > 0 && nameTokens.some(nt => searchTokens.has(nt));
+  return nameTokens.length > 0 && nameTokens.some(nt =>
+    titleTokens.has(nt) ||
+    optionTokens.some(ot => ot === nt || (ot.length >= 3 && nt.startsWith(ot)))
+  );
 }
 
 function timeAgo(ts) {
@@ -1086,9 +1091,15 @@ async function renderHistory() {
     const won        = isResolved && Number(market.resolvedOptionIndex) === Number(bet.optionIndex);
     const lost       = isResolved && !won;
     const pending    = !isResolved;
+    const isVoid     = !!bet.invalidated;
 
     let statusClass, statusText, cashflow;
-    if (pending) {
+    if (isVoid) {
+      totalLost += bet.amount;
+      statusClass = "history-status-void";
+      statusText  = "Voided";
+      cashflow    = `<span class="history-cf-loss">-$${bet.amount.toLocaleString()}</span>`;
+    } else if (pending) {
       statusClass = "history-status-pending";
       statusText  = "Open";
       cashflow    = `<span class="history-cf-neutral">-$${bet.amount.toLocaleString()}</span>`;

@@ -424,32 +424,41 @@ async function showPlayerTrades(userId) {
   const snap = await get(ref(db, "bets"));
   const allBets = snap.val() || {};
 
-  const bets = Object.values(allBets)
-    .filter(b => b.userId === userId && b.marketId)
-    .sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
+  const bets = Object.entries(allBets)
+    .filter(([, b]) => b.userId === userId && b.marketId)
+    .sort(([, a], [, b]) => (b.timestamp || 0) - (a.timestamp || 0));
 
   if (bets.length === 0) {
     panel.innerHTML = `<div class="player-trades-loading">No trades yet.</div>`;
     return;
   }
 
-  const rows = bets.map(b => {
+  panel.innerHTML = "";
+  bets.forEach(([betKey, b]) => {
     const market = allMarkets[b.marketId];
     const isResolved = market?.status === "resolved";
     const won = isResolved && Number(market.resolvedOptionIndex) === Number(b.optionIndex);
     const lost = isResolved && !won;
-    const statusClass = won ? "trade-status-won" : lost ? "trade-status-lost" : "trade-status-open";
-    const statusText  = won ? "Won" : lost ? "Lost" : "Open";
-    const title = (b.marketTitle || "Unknown").slice(0, 40);
-    return `<div class="player-trade-row">
+    const isVoid = !!b.invalidated;
+    const statusClass = isVoid ? "trade-status-void" : won ? "trade-status-won" : lost ? "trade-status-lost" : "trade-status-open";
+    const statusText  = isVoid ? "Void" : won ? "Won" : lost ? "Lost" : "Open";
+    const title = (b.marketTitle || "Unknown").slice(0, 35);
+
+    const tradeEl = document.createElement("div");
+    tradeEl.className = "player-trade-row";
+    tradeEl.innerHTML = `
       <span class="player-trade-status ${statusClass}">${statusText}</span>
       <span class="player-trade-title">${title}</span>
       <span class="player-trade-option">${b.option || ""}</span>
       <span class="player-trade-amt">$${(b.amount || 0).toLocaleString()}</span>
-    </div>`;
-  }).join("");
+      ${!isVoid ? `<button class="trade-invalidate-btn" data-key="${betKey}" data-amt="${b.amount || 0}" data-uid="${userId}">Void</button>` : ""}
+    `;
+    panel.appendChild(tradeEl);
+  });
 
-  panel.innerHTML = rows;
+  panel.querySelectorAll(".trade-invalidate-btn").forEach(btn => {
+    btn.addEventListener("click", () => invalidateBet(btn.dataset.key, btn.dataset.uid, Number(btn.dataset.amt)));
+  });
 }
 
 function showAdjustPicker(userId) {
@@ -548,6 +557,20 @@ window.deleteUser = async function(userId, name) {
 };
 
 
+async function invalidateBet(betKey, userId, amount) {
+  if (!confirm(`Void this bet? The player loses $${amount.toLocaleString()} with no refund.`)) return;
+  await update(ref(db, `bets/${betKey}`), { invalidated: true, invalidatedAt: Date.now() });
+  // Deduct amount from balance since they'd otherwise keep it on resolution
+  const balSnap = await get(ref(db, `users/${userId}/balance`));
+  const cur = balSnap.val() ?? 1000;
+  await update(ref(db, `users/${userId}`), { balance: cur - amount });
+  showToast(`Bet voided. $${amount.toLocaleString()} deducted.`);
+  // Refresh the panel
+  const panel = document.getElementById(`trades-panel-${userId}`);
+  if (panel) panel.remove();
+  showPlayerTrades(userId);
+}
+
 // ─── RESOLVE ──────────────────────────────────────────────────
 window.showResolveOptions = function(id) {
   // Toggle picker off if already open
@@ -592,10 +615,11 @@ window.resolveMarket = async function(id, winningIndex) {
   const betsSnap = await get(ref(db, "bets"));
   const allBets  = betsSnap.val() || {};
 
-  // Tally payouts per user
+  // Tally payouts per user — skip invalidated bets
   const payouts = {};
   Object.values(allBets).forEach(bet => {
     if (bet.marketId !== id) return;
+    if (bet.invalidated) return;
     if (Number(bet.optionIndex) !== winningIndex) return;
     payouts[bet.userId] = (payouts[bet.userId] || 0) + (bet.payout || 0);
   });
