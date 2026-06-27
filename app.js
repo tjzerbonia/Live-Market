@@ -1072,7 +1072,11 @@ window.submitBet = async function() {
 // ─── ACTIVITY FEED ───────────────────────────────────────────
 let cachedActivityBets = [];
 
-const REACTION_EMOJIS = ["🔥", "👀", "💯"];
+const REACTION_EMOJIS = [
+  { key: "fire",    emoji: "🔥" },
+  { key: "eyes",    emoji: "👀" },
+  { key: "hundred", emoji: "💯" },
+];
 
 function renderActivityFeed() {
   if (!cachedActivityBets.length) return;
@@ -1089,11 +1093,10 @@ function renderActivityFeed() {
     const safeTitle = escHtml((bet.marketTitle || "a market").slice(0, 45));
     const safeLabel = escHtml(label);
 
-    const reactionBtns = REACTION_EMOJIS.map((emoji, ei) => {
-      const emojiReactions = (allReactions[key] && allReactions[key][emoji]) || {};
+    const reactionBtns = REACTION_EMOJIS.map(({ key: rkey, emoji }, ei) => {
+      const emojiReactions = (allReactions[key] && allReactions[key][rkey]) || {};
       const count   = Object.keys(emojiReactions).length;
       const reacted = user.id && !!emojiReactions[user.id];
-      // data-rkey/data-ei used for event delegation — avoids emoji-in-attribute parsing issues
       return `<button class="reaction-btn${reacted ? " reacted" : ""}" data-rkey="${key}" data-ei="${ei}">${emoji}${count > 0 ? `<span class="reaction-count">${count}</span>` : ""}</button>`;
     }).join("");
     const reactionRow = `<div class="activity-reactions">${reactionBtns}</div>`;
@@ -1116,8 +1119,8 @@ function renderActivityFeed() {
   feed.querySelectorAll(".reaction-btn").forEach(btn => {
     btn.addEventListener("click", (e) => {
       e.stopPropagation();
-      const emoji = REACTION_EMOJIS[parseInt(btn.dataset.ei, 10)];
-      toggleReaction(btn.dataset.rkey, emoji);
+      const { key: emojiKey } = REACTION_EMOJIS[parseInt(btn.dataset.ei, 10)];
+      toggleReaction(btn.dataset.rkey, emojiKey);
     });
   });
 }
