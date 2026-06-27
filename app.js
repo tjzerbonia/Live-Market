@@ -4,7 +4,7 @@
 
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
 import {
-  getDatabase, ref, push, onValue, runTransaction, serverTimestamp, update, get
+  getDatabase, ref, push, onValue, runTransaction, serverTimestamp, update, get, remove
 } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
 
 const firebaseConfig = {
@@ -578,6 +578,15 @@ function scheduleRenderMarkets() {
   _renderTimer = setTimeout(renderMarkets, 30);
 }
 
+// ─── PAGE TABS ───────────────────────────────────────────────
+window.setPageTab = function(tab) {
+  document.getElementById("tab-markets").style.display    = tab === "markets"     ? "" : "none";
+  document.getElementById("tab-leaderboard").style.display = tab === "leaderboard" ? "" : "none";
+  document.querySelectorAll(".page-tab").forEach(btn => {
+    btn.classList.toggle("active", btn.dataset.tab === tab);
+  });
+};
+
 // ─── MARKET FILTER ───────────────────────────────────────────
 window.setMarketFilter = function(filter) {
   marketFilter = filter;
@@ -699,17 +708,6 @@ function renderMarkets() {
                 </div>`))
       : `<div class="market-bet-btns"></div>`;
 
-    // Reaction buttons
-    const EMOJIS = ["🔥", "👀", "😬"];
-    const reactionRow = `<div class="reaction-row" onclick="event.stopPropagation()">` +
-      EMOJIS.map(emoji => {
-        const emojiReactions = (allReactions[id] && allReactions[id][emoji]) || {};
-        const count = Object.keys(emojiReactions).length;
-        const reacted = user.id && !!emojiReactions[user.id];
-        return `<button class="reaction-btn${reacted ? " reacted" : ""}" onclick="toggleReaction('${id}','${emoji}')">` +
-          `${emoji}<span class="reaction-count">${count > 0 ? count : ""}</span></button>`;
-      }).join("") + `</div>`;
-
     return `
       <div class="market-card ${isClosed ? "market-card-closed" : ""}" onclick="openBetModal('${id}',0)">
         <div class="market-card-header">
@@ -730,7 +728,6 @@ function renderMarkets() {
           </div>
           ${footerBtns}
         </div>
-        ${reactionRow}
       </div>`;
   }).join("");
 }
@@ -1075,9 +1072,11 @@ window.submitBet = async function() {
 // ─── ACTIVITY FEED ───────────────────────────────────────────
 let cachedActivityBets = [];
 
+const REACTION_EMOJIS = ["🔥", "👀", "😬"];
+
 function renderActivityFeed() {
   if (!cachedActivityBets.length) return;
-  document.getElementById("activity-feed").innerHTML = cachedActivityBets.slice(0, 10).map((bet, i) => {
+  document.getElementById("activity-feed").innerHTML = cachedActivityBets.slice(0, 10).map(({ key, bet }, i) => {
     const label = bet.option || bet.side || "YES";
     const isNo  = label.toUpperCase() === "NO";
     const opacity = i <= 6 ? 1 : Math.max(0.1, 1 - (i - 6) * 0.3);
@@ -1088,6 +1087,16 @@ function renderActivityFeed() {
     const safeName  = escHtml(bet.userName || "Anonymous");
     const safeTitle = escHtml((bet.marketTitle || "a market").slice(0, 45));
     const safeLabel = escHtml(label);
+
+    const reactionRow = `<div class="activity-reactions">` +
+      REACTION_EMOJIS.map(emoji => {
+        const emojiReactions = (allReactions[key] && allReactions[key][emoji]) || {};
+        const count   = Object.keys(emojiReactions).length;
+        const reacted = user.id && !!emojiReactions[user.id];
+        return `<button class="reaction-btn${reacted ? " reacted" : ""}" onclick="toggleReaction('${key}','${emoji}')">` +
+          `${emoji}${count > 0 ? `<span class="reaction-count">${count}</span>` : ""}</button>`;
+      }).join("") + `</div>`;
+
     return `
     <div class="activity-item" style="opacity:${opacity}">
       ${avatarEl}
@@ -1098,6 +1107,7 @@ function renderActivityFeed() {
       <div class="activity-side${isNo ? " no" : ""}">${safeLabel}</div>
       <div class="activity-amount">$${bet.amount}</div>
       <div class="activity-time">${timeAgo(bet.timestamp)}</div>
+      ${reactionRow}
     </div>`;
   }).join("");
 }
@@ -1106,9 +1116,10 @@ function subscribeToActivity() {
   onValue(ref(db, "bets"), (snap) => {
     const data = snap.val();
     if (!data) return;
-    cachedActivityBets = Object.values(data)
-      .filter(b => b.marketId)  // only real trades have a marketId
-      .sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
+    cachedActivityBets = Object.entries(data)
+      .filter(([, b]) => b.marketId)
+      .sort(([, a], [, b]) => (b.timestamp || 0) - (a.timestamp || 0))
+      .map(([key, bet]) => ({ key, bet }));
     renderActivityFeed();
   });
 }
@@ -1325,18 +1336,18 @@ async function renderPositions() {
 function subscribeToReactions() {
   onValue(ref(db, "reactions"), (snap) => {
     allReactions = snap.val() || {};
-    scheduleRenderMarkets();
+    renderActivityFeed();
   });
 }
 
-window.toggleReaction = async function(marketId, emoji) {
+window.toggleReaction = async function(betKey, emoji) {
   if (!user.id) return;
-  const path = `reactions/${marketId}/${emoji}/${user.id}`;
-  const snap = await get(ref(db, path));
+  const path = ref(db, `reactions/${betKey}/${emoji}/${user.id}`);
+  const snap = await get(path);
   if (snap.exists()) {
-    await update(ref(db, `reactions/${marketId}/${emoji}`), { [user.id]: null });
+    await remove(path);
   } else {
-    await update(ref(db, `reactions/${marketId}/${emoji}`), { [user.id]: true });
+    await update(ref(db, `reactions/${betKey}/${emoji}`), { [user.id]: true });
   }
 };
 

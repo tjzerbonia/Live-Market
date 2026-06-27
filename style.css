@@ -277,6 +277,28 @@ main {
   100% { transform: scale(1);   opacity: 0; }
 }
 
+/* === Page Tabs === */
+.page-tab-row {
+  display: flex;
+  gap: 0;
+  border-bottom: 2px solid var(--border);
+  margin-bottom: 1.5rem;
+}
+.page-tab {
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -2px;
+  padding: 0.5rem 1.25rem;
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: color 0.15s, border-color 0.15s;
+}
+.page-tab:hover { color: var(--text); }
+.page-tab.active { color: var(--text); border-bottom-color: var(--accent); }
+
 /* === Market Filter === */
 .market-filter-row {
   display: flex;
@@ -857,6 +879,7 @@ main {
 }
 .activity-item {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 0.875rem;
   background: var(--bg-card);
@@ -865,6 +888,12 @@ main {
   padding: 0.75rem 1rem;
   font-size: 0.825rem;
   animation: fadeIn 0.3s ease;
+}
+.activity-reactions {
+  width: 100%;
+  display: flex;
+  gap: 0.3rem;
+  margin-top: -0.25rem;
 }
 @keyframes fadeIn {
   from { opacity: 0; transform: translateY(-6px); }

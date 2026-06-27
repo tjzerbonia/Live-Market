@@ -59,31 +59,39 @@
       </div>
     </div>
 
-    <div class="market-filter-row">
-      <button class="market-filter-btn active" data-filter="all" onclick="setMarketFilter('all')">All</button>
-      <button class="market-filter-btn" data-filter="open" onclick="setMarketFilter('open')">Open</button>
-      <button class="market-filter-btn" data-filter="resolved" onclick="setMarketFilter('resolved')">Resolved</button>
+    <div class="page-tab-row">
+      <button class="page-tab active" data-tab="markets" onclick="setPageTab('markets')">Markets</button>
+      <button class="page-tab" data-tab="leaderboard" onclick="setPageTab('leaderboard')">Leaderboard</button>
     </div>
 
-    <div class="category-filter-row" id="category-filter-row" style="display:none">
-      <!-- injected by JS -->
-    </div>
-
-    <div class="markets-grid" id="markets-grid">
-      <!-- Markets injected by JS -->
-    </div>
-
-    <section class="leaderboard-section">
-      <h2>Leaderboard</h2>
-      <div class="leaderboard-list" id="leaderboard-list"></div>
-    </section>
-
-    <section class="activity-section">
-      <h2>Recent Trades</h2>
-      <div class="activity-feed" id="activity-feed">
-        <div class="activity-empty">No trades yet. Be the first!</div>
+    <!-- Markets tab -->
+    <div id="tab-markets">
+      <div class="market-filter-row">
+        <button class="market-filter-btn active" data-filter="all" onclick="setMarketFilter('all')">All</button>
+        <button class="market-filter-btn" data-filter="open" onclick="setMarketFilter('open')">Open</button>
+        <button class="market-filter-btn" data-filter="resolved" onclick="setMarketFilter('resolved')">Resolved</button>
       </div>
-    </section>
+
+      <div class="category-filter-row" id="category-filter-row" style="display:none">
+        <!-- injected by JS -->
+      </div>
+
+      <div class="markets-grid" id="markets-grid">
+        <!-- Markets injected by JS -->
+      </div>
+
+      <section class="activity-section">
+        <h2>Recent Trades</h2>
+        <div class="activity-feed" id="activity-feed">
+          <div class="activity-empty">No trades yet. Be the first!</div>
+        </div>
+      </section>
+    </div>
+
+    <!-- Leaderboard tab -->
+    <div id="tab-leaderboard" style="display:none">
+      <div class="leaderboard-list" id="leaderboard-list"></div>
+    </div>
   </main>
 
   <!-- History panel -->
