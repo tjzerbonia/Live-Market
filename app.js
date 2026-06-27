@@ -1066,10 +1066,9 @@ const REACTION_EMOJIS = [
 function renderActivityFeed() {
   if (!cachedActivityBets.length) return;
   const feed = document.getElementById("activity-feed");
-  feed.innerHTML = cachedActivityBets.slice(0, 10).map(({ key, bet }, i) => {
+  feed.innerHTML = cachedActivityBets.slice(0, 30).map(({ key, bet }) => {
     const label = bet.option || bet.side || "YES";
     const isNo  = label.toUpperCase() === "NO";
-    const opacity = i <= 6 ? 1 : Math.max(0.1, 1 - (i - 6) * 0.3);
     const betUserAvatar = usersMap[bet.userId]?.avatar;
     const avatarEl = betUserAvatar
       ? `<div class="activity-avatar has-image" style="background-image:url(${betUserAvatar})"></div>`
@@ -1090,7 +1089,7 @@ function renderActivityFeed() {
     const reactionRow = `<div class="activity-reactions${hasAnyReaction ? " has-reactions" : ""}">${reactionBtns}</div>`;
 
     return `
-    <div class="activity-item" style="opacity:${opacity}">
+    <div class="activity-item">
       ${avatarEl}
       <div class="activity-text">
         <strong>${safeName}</strong>

@@ -871,6 +871,15 @@ main {
   display: flex;
   flex-direction: column;
   gap: 0.5rem;
+  max-height: 480px;
+  overflow-y: auto;
+  mask-image: linear-gradient(to bottom, black 60%, transparent 100%);
+  -webkit-mask-image: linear-gradient(to bottom, black 60%, transparent 100%);
+  padding-bottom: 2rem;
+}
+.activity-feed:hover {
+  mask-image: linear-gradient(to bottom, black 75%, transparent 100%);
+  -webkit-mask-image: linear-gradient(to bottom, black 75%, transparent 100%);
 }
 .activity-empty {
   font-size: 0.875rem;
