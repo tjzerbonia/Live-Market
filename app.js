@@ -1327,30 +1327,24 @@ async function renderPositions() {
 
 // ─── REACTIONS ────────────────────────────────────────────────
 function subscribeToReactions() {
-  let firstLoad = true;
   onValue(ref(db, "reactions"), (snap) => {
     allReactions = snap.val() || {};
-    if (!firstLoad) showToast(`Step 3: listener fired — ${Object.keys(allReactions).length} reactions`);
-    firstLoad = false;
     renderActivityFeed();
   });
 }
 
 window.toggleReaction = async function(betKey, emoji) {
-  if (!user.id) { showToast("No user"); return; }
-  showToast("Step 1: toggling...");
+  if (!user.id) return;
   try {
     const path = ref(db, `reactions/${betKey}/${emoji}/${user.id}`);
     const snap = await get(path);
     if (snap.exists()) {
       await remove(path);
-      showToast("Step 2: removed");
     } else {
       await update(ref(db, `reactions/${betKey}/${emoji}`), { [user.id]: true });
-      showToast("Step 2: written!");
     }
   } catch (err) {
-    showToast("ERROR: " + err.message);
+    console.error("toggleReaction failed:", err);
   }
 };
 
