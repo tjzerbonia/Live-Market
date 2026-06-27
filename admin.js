@@ -721,16 +721,16 @@ function subscribeToTradeLog() {
     const el = document.getElementById("admin-trade-log");
     if (!el) return;
 
-    const bets = Object.values(data)
-      .filter(b => b.marketId && !b.invalidated)
-      .sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
+    const bets = Object.entries(data)
+      .filter(([, b]) => b.marketId && !b.invalidated)
+      .sort(([, a], [, b]) => (b.timestamp || 0) - (a.timestamp || 0));
 
     if (bets.length === 0) {
       el.innerHTML = `<div class="list-empty">No trades yet.</div>`;
       return;
     }
 
-    el.innerHTML = bets.map(b => {
+    el.innerHTML = bets.map(([betKey, b]) => {
       const market = allMarkets[b.marketId];
       const isResolved = market?.status === "resolved";
       const won  = isResolved && Number(market.resolvedOptionIndex) === Number(b.optionIndex);
@@ -745,8 +745,13 @@ function subscribeToTradeLog() {
           <span class="player-trade-option">${b.option || ""}</span>
           <span class="player-trade-amt">$${(b.amount || 0).toLocaleString()}</span>
           <span class="player-seen">${timeAgo(b.timestamp)}</span>
+          <button class="trade-invalidate-btn" data-key="${betKey}" data-amt="${b.amount || 0}" data-uid="${b.userId || ""}">Void</button>
         </div>`;
     }).join("");
+
+    el.querySelectorAll(".trade-invalidate-btn").forEach(btn => {
+      btn.addEventListener("click", () => invalidateBet(btn.dataset.key, btn.dataset.uid, Number(btn.dataset.amt)));
+    });
   });
 }
 
