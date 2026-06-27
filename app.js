@@ -1057,7 +1057,7 @@ window.submitBet = async function() {
 
 // ─── ACTIVITY FEED ───────────────────────────────────────────
 let cachedActivityBets = [];
-let activityShowCount = 8;
+let activityTab = "recent";
 
 const REACTION_EMOJIS = [
   { key: "fire",    emoji: "🔥" },
@@ -1065,61 +1065,75 @@ const REACTION_EMOJIS = [
   { key: "hundred", emoji: "💯" },
 ];
 
+window.setActivityTab = function(tab) {
+  activityTab = tab;
+  document.querySelectorAll(".activity-tab").forEach(btn => {
+    btn.classList.toggle("active", btn.dataset.atab === tab);
+  });
+  renderActivityFeed();
+};
+
+function getReactionScore(betKey) {
+  const betReactions = allReactions[betKey] || {};
+  return REACTION_EMOJIS.reduce((sum, { key }) => sum + Object.keys(betReactions[key] || {}).length, 0);
+}
+
 function renderActivityFeed() {
   if (!cachedActivityBets.length) return;
   const feed = document.getElementById("activity-feed");
-  const visible = cachedActivityBets.slice(0, activityShowCount);
-  const hasMore = cachedActivityBets.length > activityShowCount;
-  const isExpanded = activityShowCount > 8;
-  feed.classList.toggle("expanded", isExpanded);
-  feed.innerHTML = visible.map(({ key, bet }) => {
-    const label = bet.option || bet.side || "YES";
-    const isNo  = label.toUpperCase() === "NO";
-    const betUserAvatar = usersMap[bet.userId]?.avatar;
-    const avatarEl = betUserAvatar
-      ? `<div class="activity-avatar has-image" style="background-image:url(${betUserAvatar})"></div>`
-      : `<div class="activity-avatar">${getInitials(bet.userName || "?")}</div>`;
-    const safeName  = escHtml(bet.userName || "Anonymous");
-    const safeTitle = escHtml((bet.marketTitle || "a market").slice(0, 45));
-    const safeLabel = escHtml(label);
 
-    const reactionBtns = REACTION_EMOJIS.map(({ key: rkey, emoji }) => {
-      const emojiReactions = (allReactions[key] && allReactions[key][rkey]) || {};
-      const count   = Object.keys(emojiReactions).length;
-      const reacted = user.id && !!emojiReactions[user.id];
-      return `<button class="reaction-btn${reacted ? " reacted" : ""}" onclick="event.stopPropagation();toggleReaction('${key}','${rkey}')">${emoji}${count > 0 ? `<span class="reaction-count">${count}</span>` : ""}</button>`;
-    }).join("");
-    const hasAnyReaction = REACTION_EMOJIS.some(({ key: rkey }) =>
-      Object.keys((allReactions[key]?.[rkey]) || {}).length > 0
-    );
-    const reactionRow = `<div class="activity-reactions${hasAnyReaction ? " has-reactions" : ""}">${reactionBtns}</div>`;
+  if (activityTab === "hot") {
+    const hot = [...cachedActivityBets]
+      .map(item => ({ ...item, score: getReactionScore(item.key) }))
+      .filter(item => item.score > 0)
+      .sort((a, b) => b.score - a.score)
+      .slice(0, 20);
+    if (hot.length === 0) {
+      feed.innerHTML = `<div class="hot-empty">No reactions yet — be the first to react to a trade!</div>`;
+      return;
+    }
+    feed.innerHTML = hot.map(({ key, bet, score }) => renderActivityItem(key, bet)).join("");
+    return;
+  }
 
-    return `
-    <div class="activity-item">
-      ${avatarEl}
-      <div class="activity-text">
-        <strong>${safeName}</strong>
-        bet on <strong>${safeTitle}${(bet.marketTitle?.length || 0) > 45 ? "…" : ""}</strong>
-      </div>
-      <div class="activity-side${isNo ? " no" : ""}">${safeLabel}</div>
-      <div class="activity-amount">$${bet.amount}</div>
-      <div class="activity-time">${timeAgo(bet.timestamp)}</div>
-      ${reactionRow}
-    </div>`;
-  }).join("") + (hasMore
-    ? `<button class="activity-show-more" id="activity-show-more">Show more</button>`
-    : isExpanded
-      ? `<button class="activity-show-more" id="activity-show-less">Show less</button>`
-      : "");
+  const visible = cachedActivityBets.slice(0, 30);
+  feed.innerHTML = visible.map(({ key, bet }) => renderActivityItem(key, bet)).join("");
+}
 
-  document.getElementById("activity-show-more")?.addEventListener("click", () => {
-    activityShowCount += 8;
-    renderActivityFeed();
-  });
-  document.getElementById("activity-show-less")?.addEventListener("click", () => {
-    activityShowCount = 8;
-    renderActivityFeed();
-  });
+function renderActivityItem(key, bet) {
+  const label = bet.option || bet.side || "YES";
+  const isNo  = label.toUpperCase() === "NO";
+  const betUserAvatar = usersMap[bet.userId]?.avatar;
+  const avatarEl = betUserAvatar
+    ? `<div class="activity-avatar has-image" style="background-image:url(${betUserAvatar})"></div>`
+    : `<div class="activity-avatar">${getInitials(bet.userName || "?")}</div>`;
+  const safeName  = escHtml(bet.userName || "Anonymous");
+  const safeTitle = escHtml((bet.marketTitle || "a market").slice(0, 45));
+  const safeLabel = escHtml(label);
+
+  const reactionBtns = REACTION_EMOJIS.map(({ key: rkey, emoji }) => {
+    const emojiReactions = (allReactions[key] && allReactions[key][rkey]) || {};
+    const count   = Object.keys(emojiReactions).length;
+    const reacted = user.id && !!emojiReactions[user.id];
+    return `<button class="reaction-btn${reacted ? " reacted" : ""}" onclick="event.stopPropagation();toggleReaction('${key}','${rkey}')">${emoji}${count > 0 ? `<span class="reaction-count">${count}</span>` : ""}</button>`;
+  }).join("");
+  const hasAnyReaction = REACTION_EMOJIS.some(({ key: rkey }) =>
+    Object.keys((allReactions[key]?.[rkey]) || {}).length > 0
+  );
+  const reactionRow = `<div class="activity-reactions${hasAnyReaction ? " has-reactions" : ""}">${reactionBtns}</div>`;
+
+  return `
+  <div class="activity-item">
+    ${avatarEl}
+    <div class="activity-text">
+      <strong>${safeName}</strong>
+      bet on <strong>${safeTitle}${(bet.marketTitle?.length || 0) > 45 ? "…" : ""}</strong>
+    </div>
+    <div class="activity-side${isNo ? " no" : ""}">${safeLabel}</div>
+    <div class="activity-amount">$${bet.amount}</div>
+    <div class="activity-time">${timeAgo(bet.timestamp)}</div>
+    ${reactionRow}
+  </div>`;
 }
 
 function subscribeToActivity() {

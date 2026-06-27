@@ -80,7 +80,12 @@
       </div>
 
       <section class="activity-section">
-        <h2>Recent Trades</h2>
+        <div class="activity-section-header">
+          <div class="activity-tabs">
+            <button class="activity-tab active" data-atab="recent" onclick="setActivityTab('recent')">Recent Trades</button>
+            <button class="activity-tab" data-atab="hot" onclick="setActivityTab('hot')">🔥 Hot Bets</button>
+          </div>
+        </div>
         <div class="activity-feed" id="activity-feed">
           <div class="activity-empty">No trades yet. Be the first!</div>
         </div>
