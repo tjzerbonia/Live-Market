@@ -1327,23 +1327,30 @@ async function renderPositions() {
 
 // ─── REACTIONS ────────────────────────────────────────────────
 function subscribeToReactions() {
+  let firstLoad = true;
   onValue(ref(db, "reactions"), (snap) => {
     allReactions = snap.val() || {};
-    showToast(`Reactions updated — ${Object.keys(allReactions).length} bets have reactions`);
+    if (!firstLoad) showToast(`Step 3: listener fired — ${Object.keys(allReactions).length} reactions`);
+    firstLoad = false;
     renderActivityFeed();
   });
 }
 
 window.toggleReaction = async function(betKey, emoji) {
-  if (!user.id) { showToast("No user — reaction blocked"); return; }
-  const path = ref(db, `reactions/${betKey}/${emoji}/${user.id}`);
-  const snap = await get(path);
-  if (snap.exists()) {
-    await remove(path);
-    showToast("Removed reaction");
-  } else {
-    await update(ref(db, `reactions/${betKey}/${emoji}`), { [user.id]: true });
-    showToast("Wrote reaction to Firebase");
+  if (!user.id) { showToast("No user"); return; }
+  showToast("Step 1: toggling...");
+  try {
+    const path = ref(db, `reactions/${betKey}/${emoji}/${user.id}`);
+    const snap = await get(path);
+    if (snap.exists()) {
+      await remove(path);
+      showToast("Step 2: removed");
+    } else {
+      await update(ref(db, `reactions/${betKey}/${emoji}`), { [user.id]: true });
+      showToast("Step 2: written!");
+    }
+  } catch (err) {
+    showToast("ERROR: " + err.message);
   }
 };
 
