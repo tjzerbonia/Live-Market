@@ -1072,11 +1072,12 @@ window.submitBet = async function() {
 // ─── ACTIVITY FEED ───────────────────────────────────────────
 let cachedActivityBets = [];
 
-const REACTION_EMOJIS = ["🔥", "👀", "😬"];
+const REACTION_EMOJIS = ["🔥", "👀", "💯"];
 
 function renderActivityFeed() {
   if (!cachedActivityBets.length) return;
-  document.getElementById("activity-feed").innerHTML = cachedActivityBets.slice(0, 10).map(({ key, bet }, i) => {
+  const feed = document.getElementById("activity-feed");
+  feed.innerHTML = cachedActivityBets.slice(0, 10).map(({ key, bet }, i) => {
     const label = bet.option || bet.side || "YES";
     const isNo  = label.toUpperCase() === "NO";
     const opacity = i <= 6 ? 1 : Math.max(0.1, 1 - (i - 6) * 0.3);
@@ -1088,14 +1089,14 @@ function renderActivityFeed() {
     const safeTitle = escHtml((bet.marketTitle || "a market").slice(0, 45));
     const safeLabel = escHtml(label);
 
-    const reactionRow = `<div class="activity-reactions">` +
-      REACTION_EMOJIS.map(emoji => {
-        const emojiReactions = (allReactions[key] && allReactions[key][emoji]) || {};
-        const count   = Object.keys(emojiReactions).length;
-        const reacted = user.id && !!emojiReactions[user.id];
-        return `<button class="reaction-btn${reacted ? " reacted" : ""}" onclick="toggleReaction('${key}','${emoji}')">` +
-          `${emoji}${count > 0 ? `<span class="reaction-count">${count}</span>` : ""}</button>`;
-      }).join("") + `</div>`;
+    const reactionBtns = REACTION_EMOJIS.map((emoji, ei) => {
+      const emojiReactions = (allReactions[key] && allReactions[key][emoji]) || {};
+      const count   = Object.keys(emojiReactions).length;
+      const reacted = user.id && !!emojiReactions[user.id];
+      // data-rkey/data-ei used for event delegation — avoids emoji-in-attribute parsing issues
+      return `<button class="reaction-btn${reacted ? " reacted" : ""}" data-rkey="${key}" data-ei="${ei}">${emoji}${count > 0 ? `<span class="reaction-count">${count}</span>` : ""}</button>`;
+    }).join("");
+    const reactionRow = `<div class="activity-reactions">${reactionBtns}</div>`;
 
     return `
     <div class="activity-item" style="opacity:${opacity}">
@@ -1110,6 +1111,15 @@ function renderActivityFeed() {
       ${reactionRow}
     </div>`;
   }).join("");
+
+  // Event delegation — one listener per render avoids emoji-in-attribute issues
+  feed.querySelectorAll(".reaction-btn").forEach(btn => {
+    btn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      const emoji = REACTION_EMOJIS[parseInt(btn.dataset.ei, 10)];
+      toggleReaction(btn.dataset.rkey, emoji);
+    });
+  });
 }
 
 function subscribeToActivity() {
