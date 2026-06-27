@@ -1057,6 +1057,7 @@ window.submitBet = async function() {
 
 // ─── ACTIVITY FEED ───────────────────────────────────────────
 let cachedActivityBets = [];
+let activityShowCount = 8;
 
 const REACTION_EMOJIS = [
   { key: "fire",    emoji: "🔥" },
@@ -1067,7 +1068,9 @@ const REACTION_EMOJIS = [
 function renderActivityFeed() {
   if (!cachedActivityBets.length) return;
   const feed = document.getElementById("activity-feed");
-  feed.innerHTML = cachedActivityBets.slice(0, 30).map(({ key, bet }) => {
+  const visible = cachedActivityBets.slice(0, activityShowCount);
+  const hasMore = cachedActivityBets.length > activityShowCount;
+  feed.innerHTML = visible.map(({ key, bet }) => {
     const label = bet.option || bet.side || "YES";
     const isNo  = label.toUpperCase() === "NO";
     const betUserAvatar = usersMap[bet.userId]?.avatar;
@@ -1101,8 +1104,17 @@ function renderActivityFeed() {
       <div class="activity-time">${timeAgo(bet.timestamp)}</div>
       ${reactionRow}
     </div>`;
-  }).join("");
+  }).join("") + (hasMore
+    ? `<button class="activity-show-more" id="activity-show-more">Show more</button>`
+    : "");
 
+  const showMoreBtn = document.getElementById("activity-show-more");
+  if (showMoreBtn) {
+    showMoreBtn.addEventListener("click", () => {
+      activityShowCount += 8;
+      renderActivityFeed();
+    });
+  }
 }
 
 function subscribeToActivity() {
