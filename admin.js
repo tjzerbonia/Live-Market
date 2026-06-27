@@ -38,8 +38,7 @@ function showAdmin() {
   document.getElementById("admin-ui").classList.remove("hidden");
   subscribeToMarkets();
   subscribeToPlayers();
-  subscribeToAlerts();
-  subscribeToAlertConfig();
+  subscribeToTradeLog();
 
   document.getElementById("clear-trades-btn").addEventListener("click", async () => {
     if (!confirm("Clear all recent trades from the activity feed? This cannot be undone.")) return;
@@ -66,12 +65,6 @@ function showAdmin() {
     showToast("All balances reset to $1,000.");
   });
 
-  document.getElementById("save-threshold-btn").addEventListener("click", async () => {
-    const val = parseInt(document.getElementById("big-bet-threshold-input").value, 10);
-    if (!val || val < 1) { showToast("Enter a valid threshold."); return; }
-    await update(ref(db, "config"), { big_bet_threshold: val });
-    showToast(`Big bet threshold set to $${val.toLocaleString()}.`);
-  });
 }
 
 document.addEventListener("DOMContentLoaded", () => {
@@ -721,55 +714,41 @@ window.deleteMarket = async function(id) {
   showToast("Market deleted.");
 };
 
-// ─── ALERTS ──────────────────────────────────────────────────
-function subscribeToAlerts() {
-  onValue(ref(db, "alerts"), (snap) => {
+// ─── TRADE LOG ───────────────────────────────────────────────
+function subscribeToTradeLog() {
+  onValue(ref(db, "bets"), (snap) => {
     const data = snap.val() || {};
-    const alertsEl = document.getElementById("admin-alerts-list");
-    const badge    = document.getElementById("alerts-badge");
-    const entries  = Object.entries(data).sort((a, b) => (b[1].timestamp || 0) - (a[1].timestamp || 0));
+    const el = document.getElementById("admin-trade-log");
+    if (!el) return;
 
-    if (badge) {
-      if (entries.length > 0) {
-        badge.textContent = entries.length;
-        badge.classList.remove("hidden");
-      } else {
-        badge.classList.add("hidden");
-      }
-    }
+    const bets = Object.values(data)
+      .filter(b => b.marketId && !b.invalidated)
+      .sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
 
-    if (!alertsEl) return;
-    if (entries.length === 0) {
-      alertsEl.innerHTML = `<div class="list-empty">No alerts.</div>`;
+    if (bets.length === 0) {
+      el.innerHTML = `<div class="list-empty">No trades yet.</div>`;
       return;
     }
 
-    alertsEl.innerHTML = entries.map(([key, a]) => {
-      const ago = timeAgo(a.timestamp);
+    el.innerHTML = bets.map(b => {
+      const market = allMarkets[b.marketId];
+      const isResolved = market?.status === "resolved";
+      const won  = isResolved && Number(market.resolvedOptionIndex) === Number(b.optionIndex);
+      const lost = isResolved && !won;
+      const statusClass = won ? "trade-status-won" : lost ? "trade-status-lost" : "trade-status-open";
+      const statusText  = won ? "Won" : lost ? "Lost" : "Open";
       return `
-        <div class="admin-player-row" id="alert-row-${key}">
-          <div class="player-name">
-            <strong>${a.userName || "Unknown"}</strong> bet <strong>$${(a.amount || 0).toLocaleString()}</strong>
-            on <em>${a.option || ""}</em> in "${(a.marketTitle || "").slice(0, 40)}"
-          </div>
-          <div class="player-seen">${ago}</div>
-          <button class="admin-action-btn delete" onclick="dismissAlert('${key}')">Dismiss</button>
+        <div class="player-trade-row" style="padding:0.5rem 0;border-bottom:1px solid var(--border)">
+          <span class="player-trade-status ${statusClass}">${statusText}</span>
+          <span class="player-trade-title" style="flex:1">${b.userName || "?"}</span>
+          <span class="player-trade-option" style="flex:2;color:var(--text)">${(b.marketTitle || "").slice(0, 35)}</span>
+          <span class="player-trade-option">${b.option || ""}</span>
+          <span class="player-trade-amt">$${(b.amount || 0).toLocaleString()}</span>
+          <span class="player-seen">${timeAgo(b.timestamp)}</span>
         </div>`;
     }).join("");
   });
 }
-
-function subscribeToAlertConfig() {
-  onValue(ref(db, "config/big_bet_threshold"), (snap) => {
-    const val = snap.val();
-    const input = document.getElementById("big-bet-threshold-input");
-    if (val != null && input) input.value = val;
-  });
-}
-
-window.dismissAlert = async function(key) {
-  await remove(ref(db, `alerts/${key}`));
-};
 
 // ─── TOAST ────────────────────────────────────────────────────
 function showToast(msg) {

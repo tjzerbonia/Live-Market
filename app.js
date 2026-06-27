@@ -1078,11 +1078,11 @@ function renderActivityFeed() {
     const safeTitle = escHtml((bet.marketTitle || "a market").slice(0, 45));
     const safeLabel = escHtml(label);
 
-    const reactionBtns = REACTION_EMOJIS.map(({ key: rkey, emoji }, ei) => {
+    const reactionBtns = REACTION_EMOJIS.map(({ key: rkey, emoji }) => {
       const emojiReactions = (allReactions[key] && allReactions[key][rkey]) || {};
       const count   = Object.keys(emojiReactions).length;
       const reacted = user.id && !!emojiReactions[user.id];
-      return `<button class="reaction-btn${reacted ? " reacted" : ""}" data-rkey="${key}" data-ei="${ei}">${emoji}${count > 0 ? `<span class="reaction-count">${count}</span>` : ""}</button>`;
+      return `<button class="reaction-btn${reacted ? " reacted" : ""}" onclick="event.stopPropagation();toggleReaction('${key}','${rkey}')">${emoji}${count > 0 ? `<span class="reaction-count">${count}</span>` : ""}</button>`;
     }).join("");
     const hasAnyReaction = REACTION_EMOJIS.some(({ key: rkey }) =>
       Object.keys((allReactions[key]?.[rkey]) || {}).length > 0
@@ -1103,14 +1103,6 @@ function renderActivityFeed() {
     </div>`;
   }).join("");
 
-  // Event delegation — one listener per render avoids emoji-in-attribute issues
-  feed.querySelectorAll(".reaction-btn").forEach(btn => {
-    btn.addEventListener("click", (e) => {
-      e.stopPropagation();
-      const { key: emojiKey } = REACTION_EMOJIS[parseInt(btn.dataset.ei, 10)];
-      toggleReaction(btn.dataset.rkey, emojiKey);
-    });
-  });
 }
 
 function subscribeToActivity() {
