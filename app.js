@@ -1329,19 +1329,21 @@ async function renderPositions() {
 function subscribeToReactions() {
   onValue(ref(db, "reactions"), (snap) => {
     allReactions = snap.val() || {};
+    showToast(`Reactions updated — ${Object.keys(allReactions).length} bets have reactions`);
     renderActivityFeed();
   });
 }
 
 window.toggleReaction = async function(betKey, emoji) {
-  showToast(`Reaction: ${emoji} on ${betKey.slice(-4)}`);
   if (!user.id) { showToast("No user — reaction blocked"); return; }
   const path = ref(db, `reactions/${betKey}/${emoji}/${user.id}`);
   const snap = await get(path);
   if (snap.exists()) {
     await remove(path);
+    showToast("Removed reaction");
   } else {
     await update(ref(db, `reactions/${betKey}/${emoji}`), { [user.id]: true });
+    showToast("Wrote reaction to Firebase");
   }
 };
 
