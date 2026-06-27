@@ -894,8 +894,9 @@ function updateBetOptions() {
     const avatar = isHeadToHead
       ? `<div class="bet-option-avatar" style="background-image:url(${getAvatarForOption(opt)})"></div>`
       : "";
+    const cents = p < 1 ? "<1¢" : p > 99 ? ">99¢" : `${Math.round(p)}¢`;
     return `<button class="bet-option-btn${active}${dim}${isHeadToHead ? " h2h" : ""}" ${isOpen ? `onclick="selectOption(${i})"` : "disabled"}>
-      ${avatar}${opt}<br><span class="bet-option-prob">${fmtProb(p)}</span>
+      ${avatar}${opt}<br><span class="bet-option-prob">${cents}</span>
     </button>`;
   }).join("");
 }
