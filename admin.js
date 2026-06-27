@@ -208,7 +208,9 @@ function renderMarketList() {
           </div>
           <div class="admin-market-title">${m.title}</div>
           <div class="admin-market-stats">
-            ${options.join(" / ")}
+            ${options.length > 2
+              ? `${options.length} options`
+              : options.join(" / ")}
             · Vol: $${(m.volume || 0).toLocaleString()}
             ${m.closeDate ? `· Closes ${formatCloseDate(m.closeDate)}` : ""}
           </div>
