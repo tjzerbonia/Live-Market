@@ -38,6 +38,7 @@
           <span class="balance-label">Balance</span>
           <span class="balance-amount" id="user-balance">$1,000</span>
         </div>
+        <button class="positions-btn" onclick="openPositions()" title="View open positions">Positions</button>
         <div class="user-pill" id="user-display" onclick="openAvatarModal()" title="Update photo">
           <div class="user-avatar" id="user-avatar"></div>
           <span id="user-name-display">—</span>
@@ -64,9 +65,18 @@
       <button class="market-filter-btn" data-filter="resolved" onclick="setMarketFilter('resolved')">Resolved</button>
     </div>
 
+    <div class="category-filter-row" id="category-filter-row" style="display:none">
+      <!-- injected by JS -->
+    </div>
+
     <div class="markets-grid" id="markets-grid">
       <!-- Markets injected by JS -->
     </div>
+
+    <section class="leaderboard-section">
+      <h2>Leaderboard</h2>
+      <div class="leaderboard-list" id="leaderboard-list"></div>
+    </section>
 
     <section class="activity-section">
       <h2>Recent Trades</h2>
@@ -87,6 +97,22 @@
         <button class="modal-close" onclick="closeHistory()">&#x2715;</button>
       </div>
       <div class="history-list" id="history-list">
+        <div class="history-empty">Loading...</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Positions panel -->
+  <div id="positions-overlay" class="overlay hidden" onclick="if(event.target===this)closePositions()">
+    <div class="history-panel">
+      <div class="history-header">
+        <div>
+          <div class="history-title">My Positions</div>
+          <div class="history-subtitle" id="positions-subtitle"></div>
+        </div>
+        <button class="modal-close" onclick="closePositions()">&#x2715;</button>
+      </div>
+      <div class="history-list" id="positions-list">
         <div class="history-empty">Loading...</div>
       </div>
     </div>

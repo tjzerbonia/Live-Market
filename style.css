@@ -1050,6 +1050,147 @@ main {
   to { opacity: 0; transform: translateY(6px); }
 }
 
+/* === Positions Button === */
+.positions-btn {
+  background: none;
+  border: 1px solid var(--border-accent);
+  border-radius: var(--radius-pill);
+  color: var(--text-muted);
+  font-size: 0.78rem;
+  font-weight: 600;
+  padding: 0.35rem 0.875rem;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.positions-btn:hover { color: var(--text); border-color: var(--text-muted); background: var(--bg-hover); }
+
+/* === Category Filter Row === */
+.category-filter-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  margin-bottom: 1rem;
+  margin-top: -0.5rem;
+}
+.category-filter-row .market-filter-btn {
+  font-size: 0.73rem;
+}
+
+/* === Position Panel === */
+.position-market { font-weight: 600; }
+.position-detail { font-size: 0.72rem; color: var(--text-dim); margin-top: 0.1rem; }
+.position-prob-pill {
+  display: inline;
+  font-weight: 700;
+  color: var(--accent);
+}
+
+/* === Leaderboard === */
+.leaderboard-section {
+  margin-bottom: 2.5rem;
+}
+.leaderboard-section h2 {
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--text);
+  margin-bottom: 1rem;
+}
+.leaderboard-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+.leaderboard-row {
+  display: flex;
+  align-items: center;
+  gap: 0.875rem;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 0.6rem 1rem;
+  font-size: 0.85rem;
+  transition: background 0.1s;
+}
+.leaderboard-row.is-me {
+  border-color: var(--accent);
+  background: var(--accent-dim);
+}
+.leaderboard-rank {
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: var(--text-dim);
+  min-width: 1.5rem;
+  text-align: right;
+  flex-shrink: 0;
+}
+.leaderboard-avatar {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: var(--accent-dim);
+  border: 1px solid rgba(0,168,107,0.2);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.65rem;
+  font-weight: 700;
+  color: var(--accent);
+  flex-shrink: 0;
+  background-size: cover;
+  background-position: center;
+}
+.leaderboard-avatar.has-image { font-size: 0; }
+.leaderboard-name {
+  flex: 1;
+  font-weight: 500;
+  color: var(--text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.leaderboard-balance {
+  font-weight: 700;
+  color: var(--accent);
+  flex-shrink: 0;
+  font-size: 0.85rem;
+}
+.leaderboard-row.is-me .leaderboard-name { font-weight: 700; }
+
+/* === Emoji Reactions === */
+.reaction-row {
+  display: flex;
+  gap: 0.35rem;
+  margin-top: 0.75rem;
+  padding-top: 0.6rem;
+  border-top: 1px solid var(--border);
+}
+.reaction-btn {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  background: var(--bg);
+  border: 1px solid var(--border-accent);
+  border-radius: var(--radius-pill);
+  padding: 0.2rem 0.55rem;
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition: all 0.15s;
+  color: var(--text-muted);
+  line-height: 1.4;
+}
+.reaction-btn:hover { background: var(--bg-hover); border-color: var(--border-accent); }
+.reaction-btn.reacted {
+  background: var(--accent-dim);
+  border-color: rgba(0,168,107,0.35);
+}
+.reaction-count {
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: var(--text-muted);
+  min-width: 0.5rem;
+}
+.reaction-btn.reacted .reaction-count { color: var(--accent); }
+
 /* === Responsive === */
 @media (max-width: 600px) {
   .header-inner { padding: 0.75rem 1rem; }

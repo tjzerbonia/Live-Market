@@ -38,6 +38,8 @@ function showAdmin() {
   document.getElementById("admin-ui").classList.remove("hidden");
   subscribeToMarkets();
   subscribeToPlayers();
+  subscribeToAlerts();
+  subscribeToAlertConfig();
 
   document.getElementById("clear-trades-btn").addEventListener("click", async () => {
     if (!confirm("Clear all recent trades from the activity feed? This cannot be undone.")) return;
@@ -62,6 +64,13 @@ function showAdmin() {
     });
     await update(ref(db), updates);
     showToast("All balances reset to $1,000.");
+  });
+
+  document.getElementById("save-threshold-btn").addEventListener("click", async () => {
+    const val = parseInt(document.getElementById("big-bet-threshold-input").value, 10);
+    if (!val || val < 1) { showToast("Enter a valid threshold."); return; }
+    await update(ref(db, "config"), { big_bet_threshold: val });
+    showToast(`Big bet threshold set to $${val.toLocaleString()}.`);
   });
 }
 
@@ -710,6 +719,56 @@ window.deleteMarket = async function(id) {
   if (!confirm(`Delete "${m.title}"? This cannot be undone.`)) return;
   await remove(ref(db, `markets/${id}`));
   showToast("Market deleted.");
+};
+
+// ─── ALERTS ──────────────────────────────────────────────────
+function subscribeToAlerts() {
+  onValue(ref(db, "alerts"), (snap) => {
+    const data = snap.val() || {};
+    const alertsEl = document.getElementById("admin-alerts-list");
+    const badge    = document.getElementById("alerts-badge");
+    const entries  = Object.entries(data).sort((a, b) => (b[1].timestamp || 0) - (a[1].timestamp || 0));
+
+    if (badge) {
+      if (entries.length > 0) {
+        badge.textContent = entries.length;
+        badge.classList.remove("hidden");
+      } else {
+        badge.classList.add("hidden");
+      }
+    }
+
+    if (!alertsEl) return;
+    if (entries.length === 0) {
+      alertsEl.innerHTML = `<div class="list-empty">No alerts.</div>`;
+      return;
+    }
+
+    alertsEl.innerHTML = entries.map(([key, a]) => {
+      const ago = timeAgo(a.timestamp);
+      return `
+        <div class="admin-player-row" id="alert-row-${key}">
+          <div class="player-name">
+            <strong>${a.userName || "Unknown"}</strong> bet <strong>$${(a.amount || 0).toLocaleString()}</strong>
+            on <em>${a.option || ""}</em> in "${(a.marketTitle || "").slice(0, 40)}"
+          </div>
+          <div class="player-seen">${ago}</div>
+          <button class="admin-action-btn delete" onclick="dismissAlert('${key}')">Dismiss</button>
+        </div>`;
+    }).join("");
+  });
+}
+
+function subscribeToAlertConfig() {
+  onValue(ref(db, "config/big_bet_threshold"), (snap) => {
+    const val = snap.val();
+    const input = document.getElementById("big-bet-threshold-input");
+    if (val != null && input) input.value = val;
+  });
+}
+
+window.dismissAlert = async function(key) {
+  await remove(ref(db, `alerts/${key}`));
 };
 
 // ─── TOAST ────────────────────────────────────────────────────

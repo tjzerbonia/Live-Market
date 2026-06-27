@@ -28,6 +28,9 @@ let marketCurrentProbs = {};  // { marketId: number[] }
 let marketHistories = {};     // { marketId: number[][] }
 let usersMap = {};            // { userId: { name, avatar, ... } }
 let marketFilter = "all";     // "all" | "open" | "resolved"
+let categoryFilter = "all";  // "all" | <category string>
+let allReactions = {};        // { marketId: { emoji: { userId: true } } }
+let bigBetThreshold = 200;   // pulled from /config/big_bet_threshold
 
 // ─── SPARKLINE COLORS (one per option) ───────────────────────
 const OPTION_COLORS = ["#00a86b", "#5b7cfa", "#f59e0b", "#e879f9", "#e53935"];
@@ -141,6 +144,19 @@ function onUserReady() {
   subscribeToMarketHistories();
   subscribeToConfig();
   subscribeToUserBalance();
+  subscribeToReactions();
+  subscribeToAlertConfig();
+
+  // Auto-close markets whose closeDate has passed (runs every 60s)
+  setInterval(() => {
+    if (!user.id) return;
+    const now = new Date();
+    Object.entries(allMarkets).forEach(([id, m]) => {
+      if (m.status === "open" && m.closeDate && new Date(m.closeDate) <= now) {
+        update(ref(db, `markets/${id}`), { status: "closed", closedAt: Date.now() });
+      }
+    });
+  }, 60000);
 
   document.getElementById("avatar-update-input").addEventListener("change", async (e) => {
     const file = e.target.files[0];
@@ -520,6 +536,7 @@ function subscribeToUsers() {
   onValue(ref(db, "users"), (snap) => {
     usersMap = snap.val() || {};
     renderActivityFeed();
+    renderLeaderboard();
   });
 }
 
@@ -570,6 +587,14 @@ window.setMarketFilter = function(filter) {
   renderMarkets();
 };
 
+window.setCategoryFilter = function(cat) {
+  categoryFilter = cat;
+  document.querySelectorAll(".category-filter-btn").forEach(btn => {
+    btn.classList.toggle("active", btn.dataset.cat === cat);
+  });
+  renderMarkets();
+};
+
 // ─── MARKET RENDERING ────────────────────────────────────────
 function toArray(val) {
   if (!val) return null;
@@ -592,10 +617,31 @@ function renderMarkets() {
   const grid = document.getElementById("markets-grid");
   let entries = Object.entries(allMarkets).filter(([, m]) => m.status !== "archived");
 
+  // Build and show/hide category filter row
+  const allCats = [...new Set(Object.values(allMarkets).filter(m => m.status !== "archived").map(m => m.category || "General"))];
+  const catRow = document.getElementById("category-filter-row");
+  if (catRow) {
+    if (allCats.length >= 2) {
+      catRow.style.display = "";
+      catRow.innerHTML = [`<button class="market-filter-btn category-filter-btn${categoryFilter === "all" ? " active" : ""}" data-cat="all" onclick="setCategoryFilter('all')">All Categories</button>`]
+        .concat(allCats.map(cat =>
+          `<button class="market-filter-btn category-filter-btn${categoryFilter === cat ? " active" : ""}" data-cat="${escHtml(cat)}" onclick="setCategoryFilter('${escHtml(cat).replace(/'/g, "\\'")}')">` +
+          `${escHtml(cat)}</button>`
+        )).join("");
+    } else {
+      catRow.style.display = "none";
+    }
+  }
+
   if (marketFilter === "open") {
     entries = entries.filter(([, m]) => m.status === "open");
   } else if (marketFilter === "resolved") {
     entries = entries.filter(([, m]) => m.status === "resolved");
+  }
+
+  // Category filter
+  if (categoryFilter !== "all") {
+    entries = entries.filter(([, m]) => (m.category || "General") === categoryFilter);
   }
 
   entries = entries.sort((a, b) => {
@@ -653,6 +699,17 @@ function renderMarkets() {
                 </div>`))
       : `<div class="market-bet-btns"></div>`;
 
+    // Reaction buttons
+    const EMOJIS = ["🔥", "👀", "😬"];
+    const reactionRow = `<div class="reaction-row" onclick="event.stopPropagation()">` +
+      EMOJIS.map(emoji => {
+        const emojiReactions = (allReactions[id] && allReactions[id][emoji]) || {};
+        const count = Object.keys(emojiReactions).length;
+        const reacted = user.id && !!emojiReactions[user.id];
+        return `<button class="reaction-btn${reacted ? " reacted" : ""}" onclick="toggleReaction('${id}','${emoji}')">` +
+          `${emoji}<span class="reaction-count">${count > 0 ? count : ""}</span></button>`;
+      }).join("") + `</div>`;
+
     return `
       <div class="market-card ${isClosed ? "market-card-closed" : ""}" onclick="openBetModal('${id}',0)">
         <div class="market-card-header">
@@ -673,6 +730,7 @@ function renderMarkets() {
           </div>
           ${footerBtns}
         </div>
+        ${reactionRow}
       </div>`;
   }).join("");
 }
@@ -973,6 +1031,20 @@ window.submitBet = async function() {
     timestamp: serverTimestamp(),
   });
 
+  // Big bet alert
+  if (activeBet.amount >= bigBetThreshold) {
+    push(ref(db, "alerts"), {
+      type: "big_bet",
+      userId: user.id,
+      userName: user.name,
+      marketId: activeBet.marketId,
+      marketTitle: market.title,
+      option: optionLabel,
+      amount: activeBet.amount,
+      timestamp: Date.now(),
+    });
+  }
+
   // Nudge probabilities — scales meaningfully with bet size
   // $100 ≈ 3pts, $300 ≈ 7pts, $500 ≈ 10pts, $1000 ≈ 15pts (capped)
   await runTransaction(ref(db, `market_probs/${activeBet.marketId}`), (cur) => {
@@ -1160,6 +1232,120 @@ async function renderHistory() {
   const net = totalWon - totalLost;
   subtitleEl.innerHTML = `${myBets.length} trades · Net: <strong style="color:${net >= 0 ? 'var(--yes)' : 'var(--no)'}">${net >= 0 ? '+' : ''}$${net.toLocaleString()}</strong>`;
   listEl.innerHTML = rows;
+}
+
+// ─── LEADERBOARD ─────────────────────────────────────────────
+function renderLeaderboard() {
+  const listEl = document.getElementById("leaderboard-list");
+  if (!listEl) return;
+  const entries = Object.entries(usersMap)
+    .sort((a, b) => (b[1].balance ?? 0) - (a[1].balance ?? 0))
+    .slice(0, 20);
+  if (entries.length === 0) {
+    listEl.innerHTML = `<div class="history-empty">No players yet.</div>`;
+    return;
+  }
+  listEl.innerHTML = entries.map(([uid, u], i) => {
+    const isMe = uid === user.id;
+    const avatarEl = u.avatar
+      ? `<div class="leaderboard-avatar has-image" style="background-image:url(${u.avatar})"></div>`
+      : `<div class="leaderboard-avatar">${getInitials(u.name || "?")}</div>`;
+    const bal = (u.balance ?? 0).toLocaleString();
+    return `
+      <div class="leaderboard-row${isMe ? " is-me" : ""}">
+        <div class="leaderboard-rank">${i + 1}</div>
+        ${avatarEl}
+        <div class="leaderboard-name">${escHtml(u.name || "Unknown")}${isMe ? " (you)" : ""}</div>
+        <div class="leaderboard-balance">$${bal}</div>
+      </div>`;
+  }).join("");
+}
+
+// ─── MY POSITIONS ─────────────────────────────────────────────
+window.openPositions = function() {
+  document.getElementById("positions-overlay").classList.remove("hidden");
+  renderPositions();
+};
+
+window.closePositions = function() {
+  document.getElementById("positions-overlay").classList.add("hidden");
+};
+
+async function renderPositions() {
+  const listEl     = document.getElementById("positions-list");
+  const subtitleEl = document.getElementById("positions-subtitle");
+  listEl.innerHTML = `<div class="history-empty">Loading...</div>`;
+
+  const snap    = await get(ref(db, "bets"));
+  const allBets = snap.val() || {};
+
+  const myOpen = Object.values(allBets).filter(b => {
+    if (b.userId !== user.id) return false;
+    if (!b.marketId) return false;
+    const m = allMarkets[b.marketId];
+    return m && m.status !== "resolved" && !b.invalidated;
+  }).sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
+
+  if (myOpen.length === 0) {
+    listEl.innerHTML = `<div class="history-empty">No open positions.</div>`;
+    subtitleEl.textContent = "";
+    return;
+  }
+
+  subtitleEl.textContent = `${myOpen.length} open position${myOpen.length !== 1 ? "s" : ""}`;
+
+  listEl.innerHTML = myOpen.map(bet => {
+    const market = allMarkets[bet.marketId];
+    const probs  = getCurrentProbs(bet.marketId, market);
+    const optIdx = bet.optionIndex != null ? Number(bet.optionIndex) : 0;
+    const prob   = probs[optIdx] ?? 0;
+    const probFmt = fmtProb(prob);
+    const statusLabel = market.status === "closed" ? "Closed" : "Open";
+    const statusClass = market.status === "closed" ? "history-status-void" : "history-status-pending";
+
+    return `
+      <div class="history-row">
+        <div class="history-row-main">
+          <span class="history-status-pill ${statusClass}">${statusLabel}</span>
+          <div class="history-row-info">
+            <div class="history-row-title position-market">${escHtml((bet.marketTitle || "Unknown").slice(0, 50))}</div>
+            <div class="history-row-detail position-detail">
+              ${escHtml(bet.option)} ·
+              <span class="position-prob-pill">Current: ${probFmt}</span>
+              · $${(bet.amount || 0).toLocaleString()} bet · $${(bet.payout || 0).toLocaleString()} to win
+            </div>
+          </div>
+        </div>
+        <div class="history-cf"><span class="history-cf-neutral">-$${(bet.amount || 0).toLocaleString()}</span></div>
+      </div>`;
+  }).join("");
+}
+
+// ─── REACTIONS ────────────────────────────────────────────────
+function subscribeToReactions() {
+  onValue(ref(db, "reactions"), (snap) => {
+    allReactions = snap.val() || {};
+    scheduleRenderMarkets();
+  });
+}
+
+window.toggleReaction = async function(marketId, emoji) {
+  if (!user.id) return;
+  const path = `reactions/${marketId}/${emoji}/${user.id}`;
+  const snap = await get(ref(db, path));
+  if (snap.exists()) {
+    await update(ref(db, `reactions/${marketId}/${emoji}`), { [user.id]: null });
+  } else {
+    await update(ref(db, `reactions/${marketId}/${emoji}`), { [user.id]: true });
+  }
+};
+
+// ─── ALERT CONFIG ─────────────────────────────────────────────
+function subscribeToAlertConfig() {
+  onValue(ref(db, "config/big_bet_threshold"), (snap) => {
+    const val = snap.val();
+    if (val != null) bigBetThreshold = val;
+  });
 }
 
 // ─── INIT ─────────────────────────────────────────────────────
