@@ -379,18 +379,25 @@ function catmullRomPath(pts, tension = 0.35) {
 // Unique counter so each chart gets its own clipPath id (avoids global id conflicts)
 let _chartSeq = 0;
 
-function buildChart(history, options, W, H, PAD, strokeW, dotR, showAll, thinFactor, fixedScale = false) {
+function buildChart(history, options, W, H, PAD, strokeW, dotR, showAll, thinFactor, fixedScale = false, resolvedIndex = -1) {
   const isBinary = options.length === 2 && options[0] === 'YES' && options[1] === 'NO';
   const n = showAll ? Math.min(options.length, OPTION_COLORS.length)
                     : (isBinary ? 1 : Math.min(options.length, OPTION_COLORS.length));
+
+  const isResolved = resolvedIndex >= 0;
 
   if (!history || history.length < 2) {
     return { n, svg: `<line x1="0" y1="${H/2}" x2="${W}" y2="${H/2}" stroke="#e5e7eb" stroke-width="1.5"/>` };
   }
 
-  const pts_src = thinFactor > 1
-    ? history.filter((_, i) => i % thinFactor === 0 || i === history.length - 1)
+  // For resolved markets append a final snap driving winner to 100, losers to 0
+  const baseHistory = isResolved
+    ? [...history, options.slice(0, n).map((_, oi) => oi === resolvedIndex ? 100 : 0)]
     : history;
+
+  const pts_src = thinFactor > 1
+    ? baseHistory.filter((_, i) => i % thinFactor === 0 || i === baseHistory.length - 1)
+    : baseHistory;
 
   let minP, maxP;
   if (fixedScale) {
@@ -431,21 +438,33 @@ function buildChart(history, options, W, H, PAD, strokeW, dotR, showAll, thinFac
 
   // Endpoint dots — drawn outside clipPath so rings are never cropped
   for (let oi = 0; oi < n; oi++) {
-    const color = OPTION_COLORS[oi];
+    const color   = OPTION_COLORS[oi];
     const [ex, ey] = toXY(pts_src[pts_src.length - 1], pts_src.length - 1, oi);
-    const ringR    = dotR * 2.5;
-    const delayMs  = oi * 400;
-    // Outer pulsing ring uses CSS class; inner dot is solid
-    svg += `<circle class="chart-dot-ring" cx="${ex}" cy="${ey}" r="${ringR}" fill="${color}" style="transform-origin:${ex}px ${ey}px;animation-delay:${delayMs}ms"/>`;
-    svg += `<circle cx="${ex}" cy="${ey}" r="${dotR}" fill="${color}" stroke="#fff" stroke-width="1.5"/>`;
+
+    if (isResolved) {
+      const won  = oi === resolvedIndex;
+      const r    = dotR * 1.8;
+      const bg   = won ? "#00a86b" : "#e53935";
+      // Circle background
+      svg += `<circle cx="${ex}" cy="${ey}" r="${r}" fill="${bg}" stroke="#fff" stroke-width="1.5"/>`;
+      // ✓ or ✗ drawn as SVG text centered in the circle
+      const icon = won ? "✓" : "✕";
+      const fs   = r * 1.1;
+      svg += `<text x="${ex}" y="${(ey + fs * 0.36).toFixed(1)}" text-anchor="middle" font-size="${fs.toFixed(1)}" fill="#fff" font-family="system-ui,sans-serif" font-weight="700">${icon}</text>`;
+    } else {
+      const ringR   = dotR * 2.5;
+      const delayMs = oi * 400;
+      svg += `<circle class="chart-dot-ring" cx="${ex}" cy="${ey}" r="${ringR}" fill="${color}" style="transform-origin:${ex}px ${ey}px;animation-delay:${delayMs}ms"/>`;
+      svg += `<circle cx="${ex}" cy="${ey}" r="${dotR}" fill="${color}" stroke="#fff" stroke-width="1.5"/>`;
+    }
   }
   return { n, svg };
 }
 
-function renderSparkline(history, options, probs) {
+function renderSparkline(history, options, probs, resolvedIndex = -1) {
   const W = 260, H = 95, PAD = 5;
   // Card: fixed 0-100% scale so visual position reflects actual probability
-  const { n, svg } = buildChart(history, options, W, H, PAD, 2.2, 4, false, 4, true);
+  const { n, svg } = buildChart(history, options, W, H, PAD, 2.2, 4, false, 4, true, resolvedIndex);
 
   // Show top 2 by probability so all cards have a consistent legend height
   const allOpts = options.slice(0, n).map((opt, i) => ({ opt, i, p: probs[i] || 0 }));
@@ -611,7 +630,8 @@ function renderMarkets() {
     const options = m.options || ["YES", "NO"];
     const isBinary = options.length === 2 && options[0] === "YES" && options[1] === "NO";
 
-    const chartHTML = renderSparkline(history, options, probs);
+    const resolvedIdx = isResolved && m.resolvedOptionIndex != null ? Number(m.resolvedOptionIndex) : -1;
+    const chartHTML = renderSparkline(history, options, probs, resolvedIdx);
 
     const statusBadge = isClosed && !isResolved
       ? `<div class="market-status-badge closed">Closed</div>`
@@ -659,10 +679,10 @@ function renderMarkets() {
 }
 
 // ─── MODAL CHART ─────────────────────────────────────────────
-function renderModalChart(history, options, probs) {
+function renderModalChart(history, options, probs, resolvedIndex = -1) {
   const W = 500, H = 220, PAD = 8;
   // Modal: fixed 0-100% scale so visual position reflects actual probability
-  const { n, svg } = buildChart(history, options, W, H, PAD, 2.5, 6, true, 5, true);
+  const { n, svg } = buildChart(history, options, W, H, PAD, 2.5, 6, true, 5, true, resolvedIndex);
 
   // Legend: colored dot + name + %
   const legend = options.slice(0, n).map((opt, i) => {
@@ -742,7 +762,8 @@ window.openBetModal = function(marketId, optionIndex = 0) {
     closeDateEl.textContent = fmt;
     closeDateEl.style.display = fmt ? "" : "none";
   }
-  document.getElementById("modal-chart-area").innerHTML = renderModalChart(history, options, probs);
+  const resolvedIdx = market.status === "resolved" && market.resolvedOptionIndex != null ? Number(market.resolvedOptionIndex) : -1;
+  document.getElementById("modal-chart-area").innerHTML = renderModalChart(history, options, probs, resolvedIdx);
 
   // Winner banner
   const bannerEl = document.getElementById("modal-winner-banner");
