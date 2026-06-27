@@ -39,6 +39,7 @@ function showAdmin() {
   subscribeToMarkets();
   subscribeToPlayers();
   subscribeToTradeLog();
+  document.getElementById("export-csv-btn").addEventListener("click", exportTradeLog);
 
   document.getElementById("clear-trades-btn").addEventListener("click", async () => {
     if (!confirm("Clear all recent trades from the activity feed? This cannot be undone.")) return;
@@ -713,6 +714,50 @@ window.deleteMarket = async function(id) {
   await remove(ref(db, `markets/${id}`));
   showToast("Market deleted.");
 };
+
+// ─── EXPORT CSV ──────────────────────────────────────────────
+function exportTradeLog() {
+  const snap_ref = ref(db, "bets");
+  get(snap_ref).then(snap => {
+    const data = snap.val() || {};
+    const rows = Object.values(data)
+      .filter(b => b.marketId && !b.invalidated)
+      .sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
+
+    if (rows.length === 0) { showToast("No trades to export."); return; }
+
+    const headers = ["Player", "Market", "Option", "Amount", "Payout", "Status", "Time"];
+    const csvRows = [headers.join(",")];
+
+    rows.forEach(b => {
+      const market = allMarkets[b.marketId];
+      const isResolved = market?.status === "resolved";
+      const won  = isResolved && Number(market.resolvedOptionIndex) === Number(b.optionIndex);
+      const lost = isResolved && !won;
+      const status = won ? "Won" : lost ? "Lost" : "Open";
+      const time = b.timestamp ? new Date(b.timestamp).toLocaleString("en-US") : "";
+      const escape = v => `"${String(v ?? "").replace(/"/g, '""')}"`;
+      csvRows.push([
+        escape(b.userName),
+        escape(b.marketTitle),
+        escape(b.option),
+        b.amount || 0,
+        b.payout || 0,
+        status,
+        escape(time),
+      ].join(","));
+    });
+
+    const blob = new Blob([csvRows.join("\n")], { type: "text/csv" });
+    const url  = URL.createObjectURL(blob);
+    const a    = document.createElement("a");
+    a.href     = url;
+    a.download = `trade-log-${new Date().toISOString().slice(0,10)}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+    showToast(`Exported ${rows.length} trades.`);
+  });
+}
 
 // ─── TRADE LOG ───────────────────────────────────────────────
 function subscribeToTradeLog() {

@@ -1,5 +1,18 @@
 /* === Admin-specific styles === */
 
+.secondary-btn {
+  background: none;
+  border: 1px solid var(--border-accent);
+  border-radius: var(--radius-sm);
+  color: var(--text-muted);
+  font-size: 0.78rem;
+  font-weight: 600;
+  padding: 0.35rem 0.875rem;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.secondary-btn:hover { color: var(--text); border-color: var(--text-muted); }
+
 .admin-badge {
   font-size: 0.65rem;
   font-weight: 700;
@@ -611,9 +624,24 @@
   padding: 1rem 1.25rem;
   margin-bottom: 0.6rem;
   display: grid;
-  grid-template-columns: 1fr auto;
+  grid-template-columns: 1.25rem 1fr auto;
   gap: 0.75rem;
   align-items: center;
+}
+.drag-handle {
+  font-size: 1.1rem;
+  color: var(--text-dim);
+  cursor: grab;
+  padding: 0 0.25rem;
+  user-select: none;
+  line-height: 1;
+}
+.drag-handle:active { cursor: grabbing; }
+.draggable-row { transition: opacity 0.15s; }
+.draggable-row.drag-ghost { opacity: 0.35; }
+.draggable-row.drag-over {
+  border-color: var(--accent);
+  background: var(--accent-dim);
 }
 
 .admin-market-row.closed { opacity: 0.55; }
@@ -758,3 +786,45 @@
   transition: all 0.15s;
 }
 .resolve-cancel-btn:hover { color: var(--text); }
+
+/* === Alerts badge === */
+.alerts-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--no);
+  color: #fff;
+  font-size: 0.65rem;
+  font-weight: 700;
+  border-radius: var(--radius-pill);
+  padding: 0.1rem 0.45rem;
+  margin-left: 0.5rem;
+  vertical-align: middle;
+}
+.alerts-badge.hidden { display: none; }
+
+/* === Admin controls row === */
+.admin-controls-row {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 0.75rem 1.25rem;
+}
+.admin-control-label {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--text);
+  flex: 1;
+}
+.admin-control-input-wrap {
+  display: flex;
+  align-items: center;
+  background: var(--bg);
+  border: 1px solid var(--border-accent);
+  border-radius: var(--radius-sm);
+  padding: 0.25rem 0.6rem;
+}
+.admin-control-input-wrap:focus-within { border-color: var(--accent); }
