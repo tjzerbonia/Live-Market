@@ -442,14 +442,13 @@ function buildChart(history, options, W, H, PAD, strokeW, dotR, showAll, thinFac
     const [ex, ey] = toXY(pts_src[pts_src.length - 1], pts_src.length - 1, oi);
 
     if (isResolved) {
-      const won  = oi === resolvedIndex;
-      const r    = dotR * 1.8;
-      const bg   = won ? "#00a86b" : "#e53935";
-      // Circle background
-      svg += `<circle cx="${ex}" cy="${ey}" r="${r}" fill="${bg}" stroke="#fff" stroke-width="1.5"/>`;
-      // ✓ or ✗ drawn as SVG text centered in the circle
+      const won = oi === resolvedIndex;
+      const r   = dotR * 1.6;
       const icon = won ? "✓" : "✕";
-      const fs   = r * 1.1;
+      const fs   = r * 1.05;
+      // Same size/color dot as live, just slightly larger to fit the icon
+      svg += `<circle cx="${ex}" cy="${ey}" r="${r}" fill="${color}" stroke="#fff" stroke-width="1.5"/>`;
+      // White icon overlaid — ✓ green dot, ✕ same color dot so icon is the differentiator
       svg += `<text x="${ex}" y="${(ey + fs * 0.36).toFixed(1)}" text-anchor="middle" font-size="${fs.toFixed(1)}" fill="#fff" font-family="system-ui,sans-serif" font-weight="700">${icon}</text>`;
     } else {
       const ringR   = dotR * 2.5;
