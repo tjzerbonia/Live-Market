@@ -1070,6 +1070,8 @@ function renderActivityFeed() {
   const feed = document.getElementById("activity-feed");
   const visible = cachedActivityBets.slice(0, activityShowCount);
   const hasMore = cachedActivityBets.length > activityShowCount;
+  const isExpanded = activityShowCount > 8;
+  feed.classList.toggle("expanded", isExpanded);
   feed.innerHTML = visible.map(({ key, bet }) => {
     const label = bet.option || bet.side || "YES";
     const isNo  = label.toUpperCase() === "NO";
@@ -1106,15 +1108,18 @@ function renderActivityFeed() {
     </div>`;
   }).join("") + (hasMore
     ? `<button class="activity-show-more" id="activity-show-more">Show more</button>`
-    : "");
+    : isExpanded
+      ? `<button class="activity-show-more" id="activity-show-less">Show less</button>`
+      : "");
 
-  const showMoreBtn = document.getElementById("activity-show-more");
-  if (showMoreBtn) {
-    showMoreBtn.addEventListener("click", () => {
-      activityShowCount += 8;
-      renderActivityFeed();
-    });
-  }
+  document.getElementById("activity-show-more")?.addEventListener("click", () => {
+    activityShowCount += 8;
+    renderActivityFeed();
+  });
+  document.getElementById("activity-show-less")?.addEventListener("click", () => {
+    activityShowCount = 8;
+    renderActivityFeed();
+  });
 }
 
 function subscribeToActivity() {

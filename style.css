@@ -871,7 +871,18 @@ main {
   display: flex;
   flex-direction: column;
   gap: 0.5rem;
+  position: relative;
 }
+.activity-feed::after {
+  content: "";
+  position: absolute;
+  bottom: 2.5rem;
+  left: 0; right: 0;
+  height: 60px;
+  background: linear-gradient(to bottom, transparent, var(--bg));
+  pointer-events: none;
+}
+.activity-feed.expanded::after { display: none; }
 .activity-empty {
   font-size: 0.875rem;
   color: var(--text-dim);
