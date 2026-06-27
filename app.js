@@ -30,6 +30,7 @@ let usersMap = {};            // { userId: { name, avatar, ... } }
 let marketFilter = "open";     // "all" | "open" | "resolved"
 let categoryFilter = "all";  // "all" | <category string>
 let allReactions = {};        // { betKey: { emojiKey: { userId: true } } }
+let tradedUserIds = new Set(); // users who have placed at least one bet
 
 // ─── SPARKLINE COLORS (one per option) ───────────────────────
 const OPTION_COLORS = ["#00a86b", "#5b7cfa", "#f59e0b", "#e879f9", "#e53935"];
@@ -1108,11 +1109,13 @@ function subscribeToActivity() {
   onValue(ref(db, "bets"), (snap) => {
     const data = snap.val();
     if (!data) return;
-    cachedActivityBets = Object.entries(data)
-      .filter(([, b]) => b.marketId)
+    const entries = Object.entries(data).filter(([, b]) => b.marketId);
+    tradedUserIds = new Set(entries.map(([, b]) => b.userId).filter(Boolean));
+    cachedActivityBets = entries
       .sort(([, a], [, b]) => (b.timestamp || 0) - (a.timestamp || 0))
       .map(([key, bet]) => ({ key, bet }));
     renderActivityFeed();
+    renderLeaderboard();
   });
 }
 
@@ -1242,6 +1245,7 @@ function renderLeaderboard() {
   const listEl = document.getElementById("leaderboard-list");
   if (!listEl) return;
   const entries = Object.entries(usersMap)
+    .filter(([uid]) => tradedUserIds.has(uid))
     .sort((a, b) => (b[1].balance ?? 0) - (a[1].balance ?? 0))
     .slice(0, 20);
   if (entries.length === 0) {
