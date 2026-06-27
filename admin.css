@@ -188,6 +188,21 @@
 .trade-status-won  { background: rgba(0,168,107,0.1); color: #00a86b; }
 .trade-status-lost { background: rgba(229,57,53,0.1);  color: #e53935; }
 .trade-status-open { background: rgba(0,0,0,0.05);     color: var(--text-muted); }
+.trade-status-void { background: rgba(107,114,128,0.1); color: #6b7280; }
+.trade-invalidate-btn {
+  margin-left: auto;
+  flex-shrink: 0;
+  background: none;
+  border: 1px solid rgba(229,57,53,0.3);
+  border-radius: var(--radius-pill);
+  color: #e53935;
+  font-size: 0.68rem;
+  font-weight: 600;
+  padding: 0.15rem 0.5rem;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.trade-invalidate-btn:hover { background: rgba(229,57,53,0.08); }
 .player-trade-title  { flex: 1; color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .player-trade-option { color: var(--text-muted); flex-shrink: 0; }
 .player-trade-amt    { color: var(--text-muted); flex-shrink: 0; font-variant-numeric: tabular-nums; }
