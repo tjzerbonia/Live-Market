@@ -6,6 +6,7 @@ import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/fireba
 import {
   getDatabase, ref, push, onValue, update, remove, get
 } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
+import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
 
 const ADMIN_PASSWORD = "forecast2025";
 const MAX_OPTIONS = 5;
@@ -20,8 +21,11 @@ const firebaseConfig = {
   appId: "1:255916811056:web:3462750ee45ccad644def5",
 };
 
-const app = initializeApp(firebaseConfig);
-const db = getDatabase(app);
+const app  = initializeApp(firebaseConfig);
+const db   = getDatabase(app);
+const auth = getAuth(app);
+// Sign in anonymously immediately so all Firebase writes pass auth rules
+signInAnonymously(auth).catch(e => console.warn("Admin Firebase auth:", e));
 
 let allMarkets = {};
 let allPlayers = {};

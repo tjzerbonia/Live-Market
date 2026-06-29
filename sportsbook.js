@@ -380,6 +380,9 @@ window.removeParlayLeg = function(idx) {
 
 window.clearParlay = function() {
   parlayLegs = [];
+  // Reset slip to collapsed so a fresh parlay starts from the tab, not expanded
+  const slip = document.getElementById("parlay-slip");
+  if (slip) slip.classList.add("collapsed");
   renderSbMarkets();
   renderParlaySlip();
 };

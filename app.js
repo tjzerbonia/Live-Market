@@ -6,6 +6,7 @@ import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/fireba
 import {
   getDatabase, ref, push, onValue, runTransaction, serverTimestamp, update, get, remove
 } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
+import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
 
 const firebaseConfig = {
   apiKey: "AIzaSyD-gPi5JT8tDeXoflknm0U9Dir7642Zk8U",
@@ -17,8 +18,9 @@ const firebaseConfig = {
   appId: "1:255916811056:web:3462750ee45ccad644def5",
 };
 
-const app = initializeApp(firebaseConfig);
-const db = getDatabase(app);
+const app  = initializeApp(firebaseConfig);
+const db   = getDatabase(app);
+const auth = getAuth(app);
 
 // ─── STATE ───────────────────────────────────────────────────
 let user = { id: null, name: null, balance: 1000 };
@@ -87,6 +89,9 @@ function resizeImage(file, size = 64) {
 let pendingAvatar = null; // base64 string set before submit
 
 async function initUser() {
+  // Sign in anonymously so Firebase Rules can verify writes are authenticated
+  try { await signInAnonymously(auth); } catch (e) { console.warn("Firebase auth:", e); }
+
   const stored = localStorage.getItem("forecast_user");
   if (stored) {
     user = JSON.parse(stored);
@@ -257,6 +262,8 @@ async function registerUserInFirebase() {
   }
   const updates = { name: user.name, balance: user.balance, lastSeen: Date.now() };
   if (user.avatar) updates.avatar = user.avatar;
+  // Stamp the Firebase Auth UID so Rules can scope writes to this user only
+  if (auth.currentUser) updates.firebaseUid = auth.currentUser.uid;
   update(ref(db, `users/${user.id}`), updates);
 }
 
