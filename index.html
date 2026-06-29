@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Forecast Markets</title>
   <link rel="stylesheet" href="style.css" />
+  <link rel="stylesheet" href="sportsbook.css" />
 </head>
 <body>
 
@@ -79,6 +80,7 @@
     <div class="page-tab-row">
       <button class="page-tab active" data-tab="markets" onclick="setPageTab('markets')">Markets</button>
       <button class="page-tab" data-tab="leaderboard" onclick="setPageTab('leaderboard')">Leaderboard</button>
+      <button class="page-tab" data-tab="sportsbook" onclick="setPageTab('sportsbook')">Sportsbook</button>
     </div>
 
     <!-- Markets tab -->
@@ -116,6 +118,16 @@
     <!-- Leaderboard tab -->
     <div id="tab-leaderboard" style="display:none">
       <div class="leaderboard-list" id="leaderboard-list"></div>
+    </div>
+
+    <!-- Sportsbook tab -->
+    <div id="tab-sportsbook" style="display:none">
+      <div class="sb-filter-row">
+        <button class="market-filter-btn active" data-sbfilter="open" onclick="setSbFilter('open')">Open</button>
+        <button class="market-filter-btn" data-sbfilter="closed" onclick="setSbFilter('closed')">Closed</button>
+        <button class="market-filter-btn" data-sbfilter="all" onclick="setSbFilter('all')">All</button>
+      </div>
+      <div class="markets-grid" id="sb-markets-grid"></div>
     </div>
   </main>
 
@@ -199,5 +211,6 @@
   </div>
 
   <script type="module" src="app.js"></script>
+  <script type="module" src="sportsbook.js"></script>
 </body>
 </html>

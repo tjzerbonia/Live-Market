@@ -711,6 +711,7 @@ function scheduleRenderMarkets() {
 window.setPageTab = function(tab) {
   document.getElementById("tab-markets").style.display    = tab === "markets"     ? "" : "none";
   document.getElementById("tab-leaderboard").style.display = tab === "leaderboard" ? "" : "none";
+  document.getElementById("tab-sportsbook").style.display  = tab === "sportsbook"  ? "" : "none";  // sportsbook tab
   document.querySelectorAll(".page-tab").forEach(btn => {
     btn.classList.toggle("active", btn.dataset.tab === tab);
   });

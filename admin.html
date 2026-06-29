@@ -125,6 +125,105 @@
 
       </div>
 
+      <!-- Sportsbook Markets section -->
+      <section class="admin-players-section" style="margin-top:2rem">
+        <div class="list-header">
+          <h2>Sportsbook Markets</h2>
+        </div>
+
+        <!-- Sportsbook Create Form -->
+        <div class="admin-form-section" style="margin-bottom:1.5rem;position:static;">
+          <h3 style="font-size:0.875rem;font-weight:600;color:var(--text);margin-bottom:0.5rem;">New Sportsbook Market</h3>
+
+          <div class="form-row">
+            <div class="form-group">
+              <label>Type</label>
+              <select id="sb-subtype" onchange="onSbSubtypeChange()" style="background:var(--bg);border:1px solid var(--border-accent);border-radius:var(--radius-sm);color:var(--text);font-size:0.9rem;padding:0.6rem 0.875rem;width:100%;outline:none;">
+                <option value="moneyline">Moneyline</option>
+                <option value="spread">Spread</option>
+                <option value="total">Total (Over/Under)</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label>Category</label>
+              <input type="text" id="sb-category" placeholder="NFL, NBA…" maxlength="30" />
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label>Title</label>
+            <input type="text" id="sb-title" placeholder="Bears vs Packers" maxlength="160" />
+          </div>
+
+          <!-- Moneyline / Spread fields -->
+          <div id="sb-sides-fields">
+            <div class="form-row">
+              <div class="form-group">
+                <label>Side A Label</label>
+                <input type="text" id="sb-sideA-label" placeholder="Bears" maxlength="40" />
+              </div>
+              <div class="form-group" id="sb-sideA-spread-group">
+                <label>Side A Spread <span class="label-hint">(spread only)</span></label>
+                <input type="text" id="sb-sideA-spread" placeholder="-3.5" maxlength="10" />
+              </div>
+            </div>
+            <div class="form-group">
+              <label>Side A Odds (American)</label>
+              <input type="number" id="sb-sideA-odds" placeholder="-110" />
+            </div>
+            <div class="form-row">
+              <div class="form-group">
+                <label>Side B Label</label>
+                <input type="text" id="sb-sideB-label" placeholder="Packers" maxlength="40" />
+              </div>
+              <div class="form-group" id="sb-sideB-spread-group">
+                <label>Side B Spread <span class="label-hint">(spread only)</span></label>
+                <input type="text" id="sb-sideB-spread" placeholder="+3.5" maxlength="10" />
+              </div>
+            </div>
+            <div class="form-group">
+              <label>Side B Odds (American)</label>
+              <input type="number" id="sb-sideB-odds" placeholder="+100" />
+            </div>
+          </div>
+
+          <!-- Total (Over/Under) fields -->
+          <div id="sb-total-fields" style="display:none">
+            <div class="form-row">
+              <div class="form-group">
+                <label>Total Line</label>
+                <input type="number" id="sb-line" placeholder="47.5" step="0.5" />
+              </div>
+              <div class="form-group">
+                <label>Over Odds</label>
+                <input type="number" id="sb-over-odds" placeholder="-110" />
+              </div>
+            </div>
+            <div class="form-group">
+              <label>Under Odds</label>
+              <input type="number" id="sb-under-odds" placeholder="-110" />
+            </div>
+          </div>
+
+          <div class="form-actions" style="margin-top:0.5rem">
+            <button id="sb-save-btn" onclick="saveSbMarket()">Create Sportsbook Market</button>
+          </div>
+        </div>
+
+        <!-- Sportsbook Market List -->
+        <div class="list-header" style="margin-top:0.5rem">
+          <span style="font-size:0.875rem;font-weight:600;color:var(--text-muted)">Existing Sportsbook Markets</span>
+          <div class="status-tabs">
+            <button class="tab-btn active" onclick="filterSbMarkets('open', event)">Open</button>
+            <button class="tab-btn" onclick="filterSbMarkets('closed', event)">Closed</button>
+            <button class="tab-btn" onclick="filterSbMarkets('all', event)">All</button>
+          </div>
+        </div>
+        <div id="admin-sb-market-list">
+          <div class="list-empty">No sportsbook markets yet.</div>
+        </div>
+      </section>
+
       <!-- Players section (full width) -->
       <section class="admin-players-section">
         <div class="list-header">

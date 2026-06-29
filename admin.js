@@ -39,6 +39,7 @@ function showAdmin() {
   subscribeToMarkets();
   subscribeToPlayers();
   subscribeToTradeLog();
+  subscribeToSbMarkets();
   document.getElementById("export-csv-btn").addEventListener("click", exportTradeLog);
 
   document.getElementById("clear-trades-btn").addEventListener("click", async () => {
@@ -210,12 +211,58 @@ window.importCSV = function() {
     if (!file) { fileInput.remove(); return; }
     const text = await file.text();
     fileInput.remove();
-    const { parsed, skipped } = parseCSVMarkets(text);
-    showCSVPreview(parsed, skipped);
+
+    // Split rows by type: sportsbook rows vs prediction market rows
+    const lines = text.split(/\r?\n/);
+    const headerLine = lines[0];
+    const dataLines  = lines.slice(1).filter(l => l.trim());
+
+    const sbRows    = dataLines.filter(l => parseCSVRow(l)[0]?.toLowerCase() === "sportsbook");
+    const pmRows    = dataLines.filter(l => parseCSVRow(l)[0]?.toLowerCase() !== "sportsbook");
+
+    // Rebuild PM CSV with header so parseCSVMarkets can skip it
+    const pmText = [headerLine, ...pmRows].join("\n");
+    const { parsed, skipped } = parseCSVMarkets(pmText);
+
+    // Parse sportsbook rows
+    const sbParsed = [], sbSkipped = [];
+    sbRows.forEach(row => {
+      const cols = parseCSVRow(row);
+      // sportsbook,Category,Title,Subtype,SideA_Label,SideA_Spread,SideA_Odds,SideB_Label,SideB_Spread,SideB_Odds,Line,OverOdds,UnderOdds
+      const category = (cols[1] || "General").trim();
+      const title    = (cols[2] || "").trim();
+      const subtype  = (cols[3] || "moneyline").trim().toLowerCase();
+      if (!title) return;
+
+      const market = { type: "sportsbook", title, category, subtype, status: "open", volume: 0, createdAt: Date.now() };
+
+      if (subtype === "total") {
+        const line      = parseFloat(cols[10]) || 0;
+        const overOdds  = parseInt(cols[11]) || -110;
+        const underOdds = parseInt(cols[12]) || -110;
+        market.line = line; market.overOdds = overOdds; market.underOdds = underOdds;
+      } else {
+        const sideALabel  = (cols[4] || "Side A").trim();
+        const sideASpread = (cols[5] || "").trim();
+        const sideAOdds   = parseInt(cols[6]) || -110;
+        const sideBLabel  = (cols[7] || "Side B").trim();
+        const sideBSpread = (cols[8] || "").trim();
+        const sideBOdds   = parseInt(cols[9]) || -110;
+        market.sideA = { label: sideALabel, odds: sideAOdds };
+        market.sideB = { label: sideBLabel, odds: sideBOdds };
+        if (subtype === "spread") {
+          market.sideA.spread = sideASpread;
+          market.sideB.spread = sideBSpread;
+        }
+      }
+      sbParsed.push(market);
+    });
+
+    showCSVPreview(parsed, skipped, sbParsed, sbSkipped);
   });
 };
 
-function showCSVPreview(parsed, skipped) {
+function showCSVPreview(parsed, skipped, sbParsed = [], sbSkipped = []) {
   // Remove existing preview if any
   document.getElementById("csv-preview-modal")?.remove();
 
@@ -223,13 +270,22 @@ function showCSVPreview(parsed, skipped) {
   overlay.id = "csv-preview-modal";
   overlay.className = "csv-preview-overlay";
 
+  const totalReady = parsed.length + sbParsed.length;
+  const totalSkipped = skipped.length + sbSkipped.length;
+
   const okRows = parsed.map(m => `
     <div class="csv-preview-row ok">
       <span class="csv-preview-title">${m.title}</span>
       <span class="csv-preview-meta">${m.category} · ${m.options.join(", ")} · ${m.closeDate ? "Closes " + m.closeDate.split("T")[0] : "No close date"}</span>
     </div>`).join("");
 
-  const skipRows = skipped.map(s => `
+  const sbOkRows = sbParsed.map(m => `
+    <div class="csv-preview-row ok">
+      <span class="csv-preview-title">[SB] ${m.title}</span>
+      <span class="csv-preview-meta">${m.category} · ${m.subtype}</span>
+    </div>`).join("");
+
+  const skipRows = [...skipped, ...sbSkipped].map(s => `
     <div class="csv-preview-row skip">
       <span class="csv-preview-title">⚠ ${s.title}</span>
       <span class="csv-preview-meta">${s.reason}</span>
@@ -242,17 +298,18 @@ function showCSVPreview(parsed, skipped) {
         <button class="modal-close" id="csv-close-btn">&#x2715;</button>
       </div>
       <div class="csv-preview-summary">
-        <strong>${parsed.length}</strong> market${parsed.length !== 1 ? "s" : ""} ready to import
-        ${skipped.length ? `· <span style="color:#f59e0b">${skipped.length} skipped</span>` : ""}
+        <strong>${totalReady}</strong> market${totalReady !== 1 ? "s" : ""} ready to import
+        ${totalSkipped ? `· <span style="color:#f59e0b">${totalSkipped} skipped</span>` : ""}
       </div>
       <div class="csv-preview-list">
         ${okRows}
+        ${sbOkRows}
         ${skipRows}
       </div>
       <div class="csv-preview-actions">
         <button class="admin-action-btn" id="csv-cancel-btn">Cancel</button>
-        <button class="admin-action-btn resolve" id="csv-confirm-btn" ${parsed.length === 0 ? "disabled" : ""}>
-          Import ${parsed.length} Market${parsed.length !== 1 ? "s" : ""}
+        <button class="admin-action-btn resolve" id="csv-confirm-btn" ${totalReady === 0 ? "disabled" : ""}>
+          Import ${totalReady} Market${totalReady !== 1 ? "s" : ""}
         </button>
       </div>
     </div>`;
@@ -265,11 +322,17 @@ function showCSVPreview(parsed, skipped) {
     const btn = overlay.querySelector("#csv-confirm-btn");
     btn.disabled = true;
     btn.textContent = "Importing...";
-    await Promise.all(parsed.map(m => push(ref(db, "markets"), {
+
+    const pmImports = parsed.map(m => push(ref(db, "markets"), {
       ...m, status: "open", volume: 0, createdAt: Date.now(),
-    })));
+    }));
+    const sbImports = sbParsed.map(m => push(ref(db, "sb_markets"), {
+      ...m, status: "open", volume: 0, createdAt: Date.now(),
+    }));
+
+    await Promise.all([...pmImports, ...sbImports]);
     overlay.remove();
-    showToast(`Imported ${parsed.length} market${parsed.length !== 1 ? "s" : ""}.`);
+    showToast(`Imported ${totalReady} market${totalReady !== 1 ? "s" : ""} (${parsed.length} prediction, ${sbParsed.length} sportsbook).`);
   });
 }
 
@@ -1043,3 +1106,182 @@ function showToast(msg) {
   document.body.appendChild(t);
   setTimeout(() => t.remove(), 3000);
 }
+
+// ============================================================
+//  SPORTSBOOK ADMIN — CRUD
+//  NOTE: Firebase rules must allow write on /sb_markets, /sb_bets, /parlays
+// ============================================================
+
+let allSbMarkets = {};
+let sbAdminFilter = "open";
+
+// ─── SUBSCRIBE ────────────────────────────────────────────────
+function subscribeToSbMarkets() {
+  onValue(ref(db, "sb_markets"), (snap) => {
+    allSbMarkets = snap.val() || {};
+    renderSbMarketList();
+  });
+}
+
+// ─── SUBTYPE TOGGLE ───────────────────────────────────────────
+window.onSbSubtypeChange = function() {
+  const subtype = document.getElementById("sb-subtype").value;
+  const sidesFields = document.getElementById("sb-sides-fields");
+  const totalFields = document.getElementById("sb-total-fields");
+  const spreadGroups = document.querySelectorAll("#sb-sideA-spread-group, #sb-sideB-spread-group");
+
+  if (subtype === "total") {
+    sidesFields.style.display = "none";
+    totalFields.style.display = "";
+  } else {
+    sidesFields.style.display = "";
+    totalFields.style.display = "none";
+    spreadGroups.forEach(el => {
+      el.style.display = subtype === "spread" ? "" : "none";
+    });
+  }
+};
+
+// Initialize on page load (hide spread fields by default for moneyline)
+document.addEventListener("DOMContentLoaded", () => {
+  // Only run if sportsbook form exists (i.e., admin is authenticated already or will be)
+  const subtypeEl = document.getElementById("sb-subtype");
+  if (subtypeEl) {
+    onSbSubtypeChange();
+  }
+});
+
+// ─── SAVE SPORTSBOOK MARKET ───────────────────────────────────
+window.saveSbMarket = async function() {
+  const subtype  = document.getElementById("sb-subtype").value;
+  const category = (document.getElementById("sb-category").value || "General").trim();
+  const title    = document.getElementById("sb-title").value.trim();
+
+  if (!title) { alert("Title is required."); return; }
+
+  const data = {
+    title, category, subtype,
+    status: "open", volume: 0, createdAt: Date.now(),
+  };
+
+  if (subtype === "total") {
+    const line      = parseFloat(document.getElementById("sb-line").value);
+    const overOdds  = parseInt(document.getElementById("sb-over-odds").value);
+    const underOdds = parseInt(document.getElementById("sb-under-odds").value);
+    if (isNaN(line) || isNaN(overOdds) || isNaN(underOdds)) {
+      alert("Please fill in the total line, over odds, and under odds."); return;
+    }
+    data.line = line; data.overOdds = overOdds; data.underOdds = underOdds;
+  } else {
+    const sideALabel  = document.getElementById("sb-sideA-label").value.trim();
+    const sideBLabel  = document.getElementById("sb-sideB-label").value.trim();
+    const sideAOdds   = parseInt(document.getElementById("sb-sideA-odds").value);
+    const sideBOdds   = parseInt(document.getElementById("sb-sideB-odds").value);
+    if (!sideALabel || !sideBLabel) { alert("Side A and Side B labels are required."); return; }
+    if (isNaN(sideAOdds) || isNaN(sideBOdds)) { alert("Side odds are required (e.g. -110)."); return; }
+
+    data.sideA = { label: sideALabel, odds: sideAOdds };
+    data.sideB = { label: sideBLabel, odds: sideBOdds };
+    if (subtype === "spread") {
+      data.sideA.spread = document.getElementById("sb-sideA-spread").value.trim();
+      data.sideB.spread = document.getElementById("sb-sideB-spread").value.trim();
+    }
+  }
+
+  const btn = document.getElementById("sb-save-btn");
+  btn.disabled = true; btn.textContent = "Saving...";
+
+  await push(ref(db, "sb_markets"), data);
+
+  // Reset form
+  document.getElementById("sb-title").value = "";
+  document.getElementById("sb-category").value = "";
+  document.getElementById("sb-sideA-label").value = "";
+  document.getElementById("sb-sideA-spread").value = "";
+  document.getElementById("sb-sideA-odds").value = "";
+  document.getElementById("sb-sideB-label").value = "";
+  document.getElementById("sb-sideB-spread").value = "";
+  document.getElementById("sb-sideB-odds").value = "";
+  document.getElementById("sb-line").value = "";
+  document.getElementById("sb-over-odds").value = "";
+  document.getElementById("sb-under-odds").value = "";
+
+  btn.disabled = false; btn.textContent = "Create Sportsbook Market";
+  showToast("Sportsbook market created.");
+};
+
+// ─── FILTER ───────────────────────────────────────────────────
+window.filterSbMarkets = function(filter, event) {
+  sbAdminFilter = filter;
+  if (event) {
+    event.currentTarget.closest(".status-tabs")?.querySelectorAll(".tab-btn").forEach(b => b.classList.remove("active"));
+    event.currentTarget.classList.add("active");
+  }
+  renderSbMarketList();
+};
+
+// ─── RENDER LIST ──────────────────────────────────────────────
+function renderSbMarketList() {
+  const container = document.getElementById("admin-sb-market-list");
+  if (!container) return;
+
+  let entries = Object.entries(allSbMarkets);
+  if (sbAdminFilter === "open")   entries = entries.filter(([, m]) => m.status === "open");
+  if (sbAdminFilter === "closed") entries = entries.filter(([, m]) => m.status === "closed");
+
+  entries.sort((a, b) => (b[1].createdAt || 0) - (a[1].createdAt || 0));
+
+  if (entries.length === 0) {
+    container.innerHTML = `<div class="list-empty">No ${sbAdminFilter} sportsbook markets.</div>`;
+    return;
+  }
+
+  container.innerHTML = entries.map(([id, m]) => {
+    const isOpen  = m.status === "open";
+    const statusClass = isOpen ? "open" : "closed";
+    const statusLabel = isOpen ? "Open" : "Closed";
+
+    let sidesInfo = "";
+    if (m.subtype === "total") {
+      sidesInfo = `Over/Under ${m.line ?? ""} · Over: ${m.overOdds > 0 ? "+" : ""}${m.overOdds} · Under: ${m.underOdds > 0 ? "+" : ""}${m.underOdds}`;
+    } else {
+      const spreadA = m.sideA?.spread ? ` ${m.sideA.spread}` : "";
+      const spreadB = m.sideB?.spread ? ` ${m.sideB.spread}` : "";
+      sidesInfo = `${m.sideA?.label || "A"}${spreadA} (${m.sideA?.odds > 0 ? "+" : ""}${m.sideA?.odds}) vs ${m.sideB?.label || "B"}${spreadB} (${m.sideB?.odds > 0 ? "+" : ""}${m.sideB?.odds})`;
+    }
+
+    return `
+      <div class="admin-market-row${isOpen ? "" : " closed"}">
+        <div>
+          <div class="admin-market-meta">
+            <span class="admin-market-category">${m.category || "General"}</span>
+            <span class="market-status-pill ${statusClass}">${statusLabel}</span>
+            <span style="font-size:0.65rem;color:var(--text-dim);font-weight:600;text-transform:uppercase">${m.subtype || "moneyline"}</span>
+          </div>
+          <div class="admin-market-title">${m.title || ""}</div>
+          <div class="admin-market-stats">${sidesInfo} · Vol: $${(m.volume || 0).toLocaleString()}</div>
+        </div>
+        <div class="admin-market-actions">
+          ${isOpen
+            ? `<button class="admin-action-btn close-market" onclick="setSbMarketStatus('${id}','closed')">Close</button>`
+            : `<button class="admin-action-btn reopen"       onclick="setSbMarketStatus('${id}','open')">Reopen</button>`
+          }
+          <button class="admin-action-btn delete" onclick="deleteSbMarket('${id}')">Delete</button>
+        </div>
+      </div>`;
+  }).join("");
+}
+
+// ─── STATUS / DELETE ──────────────────────────────────────────
+window.setSbMarketStatus = async function(id, status) {
+  await update(ref(db, `sb_markets/${id}`), { status });
+  showToast(status === "open" ? "Sportsbook market reopened." : "Sportsbook market closed.");
+};
+
+window.deleteSbMarket = async function(id) {
+  const m = allSbMarkets[id];
+  if (!m) return;
+  if (!confirm(`Delete sportsbook market "${m.title}"? This cannot be undone.`)) return;
+  await remove(ref(db, `sb_markets/${id}`));
+  showToast("Sportsbook market deleted.");
+};
