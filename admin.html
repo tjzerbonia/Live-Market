@@ -215,9 +215,9 @@
         <div class="list-header" style="margin-top:0.5rem">
           <span style="font-size:0.875rem;font-weight:600;color:var(--text-muted)">Existing Sportsbook Markets</span>
           <div class="status-tabs">
-            <button class="tab-btn active" onclick="filterSbMarkets('open', event)">Open</button>
-            <button class="tab-btn" onclick="filterSbMarkets('closed', event)">Closed</button>
-            <button class="tab-btn" onclick="filterSbMarkets('all', event)">All</button>
+            <button class="tab-btn active" onclick="filterSbMarkets('open', this)">Open</button>
+            <button class="tab-btn" onclick="filterSbMarkets('closed', this)">Closed</button>
+            <button class="tab-btn" onclick="filterSbMarkets('all', this)">All</button>
           </div>
         </div>
         <div id="admin-sb-market-list">

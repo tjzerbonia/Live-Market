@@ -1211,11 +1211,11 @@ window.saveSbMarket = async function() {
 };
 
 // ─── FILTER ───────────────────────────────────────────────────
-window.filterSbMarkets = function(filter, event) {
+window.filterSbMarkets = function(filter, btn) {
   sbAdminFilter = filter;
-  if (event) {
-    event.currentTarget.closest(".status-tabs")?.querySelectorAll(".tab-btn").forEach(b => b.classList.remove("active"));
-    event.currentTarget.classList.add("active");
+  if (btn) {
+    btn.closest(".status-tabs")?.querySelectorAll(".tab-btn").forEach(b => b.classList.remove("active"));
+    btn.classList.add("active");
   }
   renderSbMarketList();
 };

@@ -1602,28 +1602,47 @@ window.openPlayerProfile = async function(uid) {
   document.getElementById("player-profile-stats").innerHTML = `<div class="profile-stat"><div class="profile-stat-label">Loading...</div></div>`;
   document.getElementById("player-profile-list").innerHTML = `<div class="history-empty">Loading...</div>`;
 
-  const snap = await get(ref(db, "bets"));
-  const allBets = snap.val() || {};
+  const [betsSnap, sbMktSnap, parlaysSnap] = await Promise.all([
+    get(ref(db, "bets")),
+    get(ref(db, "sb_markets")),
+    get(ref(db, "parlays")),
+  ]);
+  const allBets    = betsSnap.val()    || {};
+  const allSbMkts  = sbMktSnap.val()   || {};
+  const allParlays = parlaysSnap.val() || {};
 
   const userBets = Object.values(allBets)
     .filter(b => b.userId === uid && b.marketId && !b.invalidated)
     .sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
 
-  const total = userBets.length;
-  const resolvedBets = userBets.filter(b => {
-    const m = allMarkets[b.marketId];
-    return m && m.status === "resolved";
-  });
-  const wonBets = resolvedBets.filter(b => {
-    const m = allMarkets[b.marketId];
-    return m && Number(m.resolvedOptionIndex) === Number(b.optionIndex);
-  });
-  const winRate = resolvedBets.length > 0 ? Math.round((wonBets.length / resolvedBets.length) * 100) : 0;
+  // Helper: determine resolved/won for any bet type
+  function betStatus(b) {
+    if (b.isParlay && b.parlayId) {
+      const p = allParlays[b.parlayId];
+      const resolved = !!(p && (p.paid || p.voided));
+      const won      = !!(p && p.paid && !p.voided);
+      return { resolved, won };
+    }
+    if (b.sbBet && b.sbSide) {
+      const m   = allSbMkts[b.marketId];
+      const resolved = !!(m && m.status === "resolved");
+      const won      = !!(m && m.status === "resolved" && m.resolvedSide === b.sbSide);
+      return { resolved, won };
+    }
+    const m   = allMarkets[b.marketId];
+    const resolved = !!(m && m.status === "resolved");
+    const won      = !!(resolved && Number(m.resolvedOptionIndex) === Number(b.optionIndex));
+    return { resolved, won };
+  }
+
+  const total        = userBets.length;
+  const resolvedBets = userBets.filter(b => betStatus(b).resolved);
+  const wonBets      = resolvedBets.filter(b => betStatus(b).won);
+  const winRate      = resolvedBets.length > 0 ? Math.round((wonBets.length / resolvedBets.length) * 100) : 0;
 
   let totalPL = 0;
   resolvedBets.forEach(b => {
-    const m = allMarkets[b.marketId];
-    const won = m && Number(m.resolvedOptionIndex) === Number(b.optionIndex);
+    const { won } = betStatus(b);
     totalPL += won ? (b.payout || 0) - (b.amount || 0) : -(b.amount || 0);
   });
 
@@ -1640,14 +1659,12 @@ window.openPlayerProfile = async function(uid) {
   }
 
   document.getElementById("player-profile-list").innerHTML = last20.map(bet => {
-    const market = allMarkets[bet.marketId];
-    const isResolved = market && market.status === "resolved";
-    const won = isResolved && Number(market.resolvedOptionIndex) === Number(bet.optionIndex);
+    const { resolved: isResolved, won } = betStatus(bet);
     const lost = isResolved && !won;
     let statusClass = "history-status-pending", statusText = "Open", cashflow;
-    if (won)  { statusClass = "history-status-won";  statusText = "Won";  cashflow = `<span class="history-cf-win">+$${(bet.payout||0).toLocaleString()}</span>`; }
+    if (won)       { statusClass = "history-status-won";  statusText = "Won";  cashflow = `<span class="history-cf-win">+$${(bet.payout||0).toLocaleString()}</span>`; }
     else if (lost) { statusClass = "history-status-lost"; statusText = "Lost"; cashflow = `<span class="history-cf-loss">-$${(bet.amount||0).toLocaleString()}</span>`; }
-    else { cashflow = `<span class="history-cf-neutral">-$${(bet.amount||0).toLocaleString()}</span>`; }
+    else           { cashflow = `<span class="history-cf-neutral">-$${(bet.amount||0).toLocaleString()}</span>`; }
     return `
       <div class="history-row">
         <div class="history-row-main">

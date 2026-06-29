@@ -13,9 +13,10 @@ import {
 const db = getDatabase(getApp());
 
 // ─── STATE ────────────────────────────────────────────────────
-let allSbMarkets = {};
-let parlayLegs   = [];   // [{ marketId, marketTitle, side, odds, subtype, sideLabel }]
-let sbFilter     = "open"; // "open" | "closed" | "all"
+let allSbMarkets          = {};
+let parlayLegs            = [];   // [{ marketId, marketTitle, side, odds, subtype, sideLabel }]
+let sbFilter              = "open"; // "open" | "closed" | "all"
+let pendingParlayMarketId = null;  // marketId waiting for side selection in the slip
 
 // ─── ODDS HELPERS ─────────────────────────────────────────────
 function americanToDecimal(odds) {
@@ -108,16 +109,7 @@ function buildSbCard(id, m) {
 
   // Determine which side is in the parlay (for visual feedback)
   const addedLeg  = parlayLegs.find(l => l.marketId === id);
-  const addedSide = addedLeg ? addedLeg.side : null;
-
-  // Helper: parlay button for a given side key + short label
-  function parlayBtn(side, shortLabel) {
-    if (!isOpen) return "";
-    const isAdded  = addedSide === side;
-    const disabled = isAdded || (addedSide && addedSide !== side) ? "disabled" : "";
-    const label    = isAdded ? "Added" : `+ ${shortLabel}`;
-    return `<button class="sb-parlay-btn${isAdded ? " added" : ""}" onclick="addToParlay('${id}','${side}')" ${disabled}>${label}</button>`;
-  }
+  const isPending = pendingParlayMarketId === id;
 
   let sidesHtml = "";
   let parlayBtnHtml = "";
@@ -128,47 +120,43 @@ function buildSbCard(id, m) {
     const underOdds = m.underOdds ?? -110;
 
     sidesHtml = `
-      <button class="sb-side-btn${addedSide === "over" ? " selected" : ""}" onclick="sbOpenBet('${id}','over')" ${disabledAttr}>
+      <button class="sb-side-btn${addedLeg?.side === "over" ? " selected" : ""}" onclick="sbOpenBet('${id}','over')" ${disabledAttr}>
         <span class="sb-side-label">Over</span>
         <span class="sb-side-spread">${escHtml(String(line))}</span>
         <span class="sb-side-odds ${oddsClass(overOdds)}">${fmtOdds(overOdds)}</span>
       </button>
-      <button class="sb-side-btn${addedSide === "under" ? " selected" : ""}" onclick="sbOpenBet('${id}','under')" ${disabledAttr}>
+      <button class="sb-side-btn${addedLeg?.side === "under" ? " selected" : ""}" onclick="sbOpenBet('${id}','under')" ${disabledAttr}>
         <span class="sb-side-label">Under</span>
         <span class="sb-side-spread">${escHtml(String(line))}</span>
         <span class="sb-side-odds ${oddsClass(underOdds)}">${fmtOdds(underOdds)}</span>
       </button>`;
-    parlayBtnHtml = `<div class="sb-parlay-pair">
-      ${parlayBtn("over", "Over")}
-      ${parlayBtn("under", "Under")}
-    </div>`;
   } else {
-    // moneyline or spread
     const sideA  = m.sideA || {};
     const sideB  = m.sideB || {};
     const oddsA  = sideA.odds ?? -110;
     const oddsB  = sideB.odds ?? -110;
-    const labelA = sideA.label || "Side A";
-    const labelB = sideB.label || "Side B";
-    // Truncate label for the parlay button so it fits
-    const shortA = labelA.split(" ")[0];
-    const shortB = labelB.split(" ")[0];
 
     sidesHtml = `
-      <button class="sb-side-btn${addedSide === "A" ? " selected" : ""}" onclick="sbOpenBet('${id}','A')" ${disabledAttr}>
-        <span class="sb-side-label">${escHtml(labelA)}</span>
+      <button class="sb-side-btn${addedLeg?.side === "A" ? " selected" : ""}" onclick="sbOpenBet('${id}','A')" ${disabledAttr}>
+        <span class="sb-side-label">${escHtml(sideA.label || "Side A")}</span>
         <span class="sb-side-spread">${subtype === "spread" && sideA.spread ? escHtml(String(sideA.spread)) : ""}</span>
         <span class="sb-side-odds ${oddsClass(oddsA)}">${fmtOdds(oddsA)}</span>
       </button>
-      <button class="sb-side-btn${addedSide === "B" ? " selected" : ""}" onclick="sbOpenBet('${id}','B')" ${disabledAttr}>
-        <span class="sb-side-label">${escHtml(labelB)}</span>
+      <button class="sb-side-btn${addedLeg?.side === "B" ? " selected" : ""}" onclick="sbOpenBet('${id}','B')" ${disabledAttr}>
+        <span class="sb-side-label">${escHtml(sideB.label || "Side B")}</span>
         <span class="sb-side-spread">${subtype === "spread" && sideB.spread ? escHtml(String(sideB.spread)) : ""}</span>
         <span class="sb-side-odds ${oddsClass(oddsB)}">${fmtOdds(oddsB)}</span>
       </button>`;
-    parlayBtnHtml = `<div class="sb-parlay-pair">
-      ${parlayBtn("A", shortA)}
-      ${parlayBtn("B", shortB)}
-    </div>`;
+  }
+
+  if (isOpen) {
+    if (addedLeg) {
+      parlayBtnHtml = `<button class="sb-parlay-btn added" disabled>In Parlay</button>`;
+    } else if (isPending) {
+      parlayBtnHtml = `<button class="sb-parlay-btn pending" disabled>Pick a side ↓</button>`;
+    } else {
+      parlayBtnHtml = `<button class="sb-parlay-btn" onclick="openParlayForMarket('${id}')">+ Parlay</button>`;
+    }
   }
 
   return `
@@ -341,6 +329,46 @@ window.placeSbBet = async function() {
 };
 
 // ─── PARLAY ───────────────────────────────────────────────────
+window.openParlayForMarket = function(marketId) {
+  const user = getCurrentUser();
+  if (!user || !user.id) { showSbToast("Please set your name first."); return; }
+
+  const m = allSbMarkets[marketId];
+  if (!m || m.status !== "open") return;
+
+  if (parlayLegs.find(l => l.marketId === marketId)) {
+    showSbToast("This market is already in your parlay.");
+    return;
+  }
+  if (parlayLegs.length >= 8) {
+    showSbToast("Max 8 legs in a parlay.");
+    return;
+  }
+
+  pendingParlayMarketId = marketId;
+
+  const slip = document.getElementById("parlay-slip");
+  if (slip) {
+    slip.classList.add("visible");
+    slip.classList.remove("collapsed");
+  }
+  renderParlaySlip();
+  renderSbMarkets();
+};
+
+window.confirmParlayLeg = function(side) {
+  if (!pendingParlayMarketId) return;
+  const id = pendingParlayMarketId;
+  pendingParlayMarketId = null;
+  addToParlay(id, side);
+};
+
+window.cancelParlayPending = function() {
+  pendingParlayMarketId = null;
+  renderParlaySlip();
+  renderSbMarkets();
+};
+
 window.addToParlay = function(marketId, side) {
   const user = getCurrentUser();
   if (!user || !user.id) { showSbToast("Please set your name first."); return; }
@@ -403,18 +431,48 @@ function renderParlaySlip() {
   const slip = document.getElementById("parlay-slip");
   if (!slip) return;
 
-  const count = parlayLegs.length;
+  const count      = parlayLegs.length;
+  const hasPending = !!pendingParlayMarketId;
   document.getElementById("parlay-count").textContent = count;
 
-  if (count === 0) {
+  if (count === 0 && !hasPending) {
     slip.classList.remove("visible");
     return;
   }
   slip.classList.add("visible");
 
+  // Side picker for pending market
+  let pendingHtml = "";
+  if (hasPending) {
+    const pm = allSbMarkets[pendingParlayMarketId];
+    if (pm) {
+      let sideButtons = "";
+      if (pm.subtype === "total") {
+        sideButtons = `
+          <button class="parlay-side-pick-btn" onclick="confirmParlayLeg('over')">Over ${pm.line ?? ""} &nbsp;<span class="parlay-pick-odds">${fmtOdds(pm.overOdds ?? -110)}</span></button>
+          <button class="parlay-side-pick-btn" onclick="confirmParlayLeg('under')">Under ${pm.line ?? ""} &nbsp;<span class="parlay-pick-odds">${fmtOdds(pm.underOdds ?? -110)}</span></button>`;
+      } else {
+        const sA = pm.sideA || {};
+        const sB = pm.sideB || {};
+        const spreadA = pm.subtype === "spread" && sA.spread ? ` ${sA.spread}` : "";
+        const spreadB = pm.subtype === "spread" && sB.spread ? ` ${sB.spread}` : "";
+        sideButtons = `
+          <button class="parlay-side-pick-btn" onclick="confirmParlayLeg('A')">${escHtml(sA.label || "Side A")}${spreadA} &nbsp;<span class="parlay-pick-odds">${fmtOdds(sA.odds ?? -110)}</span></button>
+          <button class="parlay-side-pick-btn" onclick="confirmParlayLeg('B')">${escHtml(sB.label || "Side B")}${spreadB} &nbsp;<span class="parlay-pick-odds">${fmtOdds(sB.odds ?? -110)}</span></button>`;
+      }
+      pendingHtml = `
+        <div class="parlay-pending-picker">
+          <div class="parlay-pending-label">Pick a side to add:</div>
+          <div class="parlay-pending-market">${escHtml((pm.title || "").slice(0, 55))}</div>
+          <div class="parlay-pending-sides">${sideButtons}</div>
+          <button class="parlay-pending-cancel" onclick="cancelParlayPending()">Cancel</button>
+        </div>`;
+    }
+  }
+
   // Legs list
   const legsList = document.getElementById("parlay-legs-list");
-  legsList.innerHTML = parlayLegs.map((leg, i) => `
+  legsList.innerHTML = pendingHtml + parlayLegs.map((leg, i) => `
     <div class="parlay-leg-row">
       <div class="parlay-leg-info">
         <div class="parlay-leg-title">${escHtml((leg.marketTitle || "").slice(0, 50))}</div>
@@ -425,11 +483,12 @@ function renderParlaySlip() {
     </div>`).join("");
 
   // Combined odds display in tab
-  const multiplier = calcParlayMultiplier();
-  const tabOdds = document.getElementById("parlay-slip-odds-display");
-  if (tabOdds) tabOdds.textContent = `${multiplier.toFixed(2)}x`;
+  if (count > 0) {
+    const multiplier = calcParlayMultiplier();
+    const tabOdds = document.getElementById("parlay-slip-odds-display");
+    if (tabOdds) tabOdds.textContent = `${multiplier.toFixed(2)}x`;
+  }
 
-  // Live payout update
   updateParlayPayout();
 }
 
