@@ -306,6 +306,7 @@ window.placeSbBet = async function() {
     marketId:    activeSbBet.marketId,
     marketTitle: m.title,
     option:      sideLabel,
+    sbSide:      activeSbBet.side,
     amount,
     payout,
     timestamp:   serverTimestamp(),
@@ -475,8 +476,8 @@ window.placeParlayBet = async function() {
     }
   } catch (_) {}
 
-  // Push parlay record
-  await push(ref(db, "parlays"), {
+  // Push parlay record (save key so we can link it from /bets)
+  const parlayRef = await push(ref(db, "parlays"), {
     userId:             user.id,
     userName:           user.name,
     legs:               parlayLegs.map(l => ({
@@ -492,7 +493,7 @@ window.placeParlayBet = async function() {
     timestamp: serverTimestamp(),
   });
 
-  // Push activity feed summary
+  // Push activity feed summary (with parlayId for history lookup)
   const legSummary = parlayLegs.map(l => l.sideLabel).join(", ");
   await push(ref(db, "bets"), {
     userId:      user.id,
@@ -500,6 +501,7 @@ window.placeParlayBet = async function() {
     marketId:    "parlay",
     marketTitle: `Parlay (${parlayLegs.length} legs): ${legSummary.slice(0, 60)}`,
     option:      `${parlayLegs.length}-leg parlay`,
+    parlayId:    parlayRef.key,
     amount,
     payout,
     timestamp:   serverTimestamp(),

@@ -1380,7 +1380,8 @@ window.resolveSbMarket = async function(id, winningSideKey, winningSideLabel) {
 
     if (allWon) {
       payouts[parlay.userId] = (payouts[parlay.userId] || 0) + (parlay.payout || 0);
-      updates[`parlays/${parlayKey}/paid`] = true;
+      updates[`parlays/${parlayKey}/paid`]   = true;
+      updates[`parlays/${parlayKey}/paidAt`] = Date.now();
     }
   });
 

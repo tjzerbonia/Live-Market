@@ -619,13 +619,35 @@ function subscribeToUserBalance() {
 }
 
 async function showWinModal(gained) {
-  // Find the bets that just paid out — resolved markets where user picked the winner
-  const snap = await get(ref(db, "bets"));
-  const allBets = snap.val() || {};
+  // Find bets that just paid out (resolved within the last 10 minutes)
+  const recentWindow = Date.now() - 10 * 60 * 1000;
+
+  const [betsSnap, sbMktSnap, parlaysSnap] = await Promise.all([
+    get(ref(db, "bets")),
+    get(ref(db, "sb_markets")),
+    get(ref(db, "parlays")),
+  ]);
+  const allBets    = betsSnap.val()    || {};
+  const allSbMkts  = sbMktSnap.val()   || {};
+  const allParlays = parlaysSnap.val() || {};
+
   const winningBets = Object.values(allBets).filter(b => {
     if (b.userId !== user.id || b.invalidated) return false;
+
+    if (b.isParlay && b.parlayId) {
+      const p = allParlays[b.parlayId];
+      return p && p.paid && !p.voided && (p.paidAt || 0) > recentWindow;
+    }
+
+    if (b.sbBet && b.sbSide) {
+      const m = allSbMkts[b.marketId];
+      return m && m.status === "resolved" && m.resolvedSide === b.sbSide && (m.resolvedAt || 0) > recentWindow;
+    }
+
+    // Regular prediction market bet
     const m = allMarkets[b.marketId];
     if (!m || m.status !== "resolved") return false;
+    if ((m.resolvedAt || 0) < recentWindow) return false;
     return Number(m.resolvedOptionIndex) === Number(b.optionIndex);
   });
 
@@ -1343,8 +1365,14 @@ async function renderHistory() {
   const subtitleEl = document.getElementById("history-subtitle");
   listEl.innerHTML = `<div class="history-empty">Loading...</div>`;
 
-  const snap   = await get(ref(db, "bets"));
-  const allBets = snap.val() || {};
+  const [betsSnap, sbMktSnap, parlaysSnap] = await Promise.all([
+    get(ref(db, "bets")),
+    get(ref(db, "sb_markets")),
+    get(ref(db, "parlays")),
+  ]);
+  const allBets     = betsSnap.val()    || {};
+  const allSbMkts   = sbMktSnap.val()   || {};
+  const allParlays  = parlaysSnap.val() || {};
 
   const myBets = Object.values(allBets)
     .filter(b => b.userId === user.id)
@@ -1378,12 +1406,26 @@ async function renderHistory() {
         </div>`;
     }
 
-    const market     = allMarkets[bet.marketId];
-    const isResolved = market && market.status === "resolved";
-    const won        = isResolved && Number(market.resolvedOptionIndex) === Number(bet.optionIndex);
-    const lost       = isResolved && !won;
-    const pending    = !isResolved;
-    const isVoid     = !!bet.invalidated;
+    // Determine resolved/won/lost based on bet type
+    let isResolved, won, isVoid;
+    isVoid = !!bet.invalidated;
+
+    if (bet.isParlay && bet.parlayId) {
+      const parlay = allParlays[bet.parlayId];
+      isResolved = parlay && (parlay.paid || parlay.voided);
+      won        = !!(parlay && parlay.paid && !parlay.voided);
+    } else if (bet.sbBet && bet.sbSide) {
+      const sbm  = allSbMkts[bet.marketId];
+      isResolved = !!(sbm && sbm.status === "resolved");
+      won        = !!(sbm && sbm.status === "resolved" && sbm.resolvedSide === bet.sbSide);
+    } else {
+      const market = allMarkets[bet.marketId];
+      isResolved   = !!(market && market.status === "resolved");
+      won          = !!(isResolved && Number(market.resolvedOptionIndex) === Number(bet.optionIndex));
+    }
+
+    const lost    = isResolved && !won;
+    const pending = !isResolved;
 
     let statusClass, statusText, cashflow;
     if (isVoid) {
