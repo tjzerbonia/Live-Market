@@ -545,7 +545,7 @@ function renderSparkline(history, options, probs, resolvedIndex = -1) {
   ).join('') + (extra ? `<div class="legend-more">+${extra} more</div>` : '');
 
   return `<div class="market-chart-legend">${legend}</div>
-    <div class="market-sparkline"><svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none">${svg}</svg></div>`;
+    <div class="market-sparkline"><svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" overflow="visible">${svg}</svg></div>`;
 }
 
 // ─── CONFIG (balance reset signals) ──────────────────────────
@@ -861,7 +861,7 @@ function renderModalChart(history, options, probs, resolvedIndex = -1) {
 
   return `
     <div class="market-chart-legend">${legend}</div>
-    <div class="modal-chart-svg"><svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none">${svg}</svg></div>
+    <div class="modal-chart-svg"><svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" overflow="visible">${svg}</svg></div>
     ${breakdown}
     <div class="modal-trade-divider"></div>`;
 }
