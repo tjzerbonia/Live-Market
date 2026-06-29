@@ -45,7 +45,10 @@
 
         <!-- Create / Edit form -->
         <section class="admin-form-section">
-          <h2 id="form-heading">New Market</h2>
+          <div style="display:flex;align-items:center;justify-content:space-between;gap:0.5rem">
+            <h2 id="form-heading">New Market</h2>
+            <button class="secondary-btn" id="import-csv-btn" onclick="importCSV()">Import CSV</button>
+          </div>
           <input type="hidden" id="edit-market-id" />
 
           <div class="form-group">
@@ -63,6 +66,16 @@
               <div class="close-datetime-row">
                 <input type="date" id="f-closedate" />
                 <input type="time" id="f-closetime" />
+              </div>
+            </div>
+          </div>
+
+          <div class="form-row">
+            <div class="form-group">
+              <label>Publish date &amp; time <span class="label-hint">(optional — saves as draft)</span></label>
+              <div class="close-datetime-row">
+                <input type="date" id="f-publishdate" />
+                <input type="time" id="f-publishtime" />
               </div>
             </div>
           </div>

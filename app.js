@@ -31,6 +31,32 @@ let marketFilter = "open";     // "all" | "open" | "resolved"
 let categoryFilter = "all";  // "all" | <category string>
 let allReactions = {};        // { betKey: { emojiKey: { userId: true } } }
 let tradedUserIds = new Set(); // users who have placed at least one bet
+let marketSearch = "";         // search filter string
+let commentUnsubscribe = null; // unsubscribe fn for active comment listener
+
+// ─── DARK MODE ──────────────────────────────────────────────
+(function applyThemeOnLoad() {
+  const saved = localStorage.getItem("forecast_theme");
+  if (saved === "dark") {
+    document.documentElement.setAttribute("data-theme", "dark");
+  }
+  const btn = document.getElementById("theme-toggle");
+  if (btn) btn.textContent = saved === "dark" ? "Light" : "Dark";
+})();
+
+window.toggleTheme = function() {
+  const current = document.documentElement.getAttribute("data-theme");
+  const next = current === "dark" ? "light" : "dark";
+  if (next === "dark") {
+    document.documentElement.setAttribute("data-theme", "dark");
+    localStorage.setItem("forecast_theme", "dark");
+  } else {
+    document.documentElement.removeAttribute("data-theme");
+    localStorage.setItem("forecast_theme", "light");
+  }
+  const btn = document.getElementById("theme-toggle");
+  if (btn) btn.textContent = next === "dark" ? "Light" : "Dark";
+};
 
 // ─── SPARKLINE COLORS (one per option) ───────────────────────
 const OPTION_COLORS = ["#00a86b", "#5b7cfa", "#f59e0b", "#e879f9", "#e53935"];
@@ -146,13 +172,16 @@ function onUserReady() {
   subscribeToUserBalance();
   subscribeToReactions();
 
-  // Auto-close markets whose closeDate has passed (runs every 60s)
+  // Auto-close markets whose closeDate has passed, and auto-publish scheduled drafts (runs every 60s)
   setInterval(() => {
     if (!user.id) return;
     const now = new Date();
     Object.entries(allMarkets).forEach(([id, m]) => {
       if (m.status === "open" && m.closeDate && new Date(m.closeDate) <= now) {
         update(ref(db, `markets/${id}`), { status: "closed", closedAt: Date.now() });
+      }
+      if (m.status === "draft" && m.publishAt && new Date(m.publishAt) <= now) {
+        update(ref(db, `markets/${id}`), { status: "open" });
       }
     });
   }, 60000);
@@ -204,6 +233,45 @@ function updateBalanceDisplay() {
   const el = document.getElementById("user-balance");
   el.textContent = `$${user.balance.toLocaleString()}`;
   el.style.color = user.balance < 0 ? "var(--no)" : "";
+  updatePortfolioDisplay();
+}
+
+function updatePortfolioDisplay() {
+  const el = document.getElementById("portfolio-amount");
+  if (!el) return;
+  // Sum open (non-invalidated, non-resolved) bet amounts by current user
+  let openBetSum = 0;
+  cachedActivityBets.forEach(({ bet }) => {
+    if (bet.userId !== user.id) return;
+    if (bet.invalidated) return;
+    const market = allMarkets[bet.marketId];
+    if (!market || market.status === "resolved") return;
+    openBetSum += (bet.amount || 0);
+  });
+  const total = user.balance + openBetSum;
+  el.textContent = `$${total.toLocaleString()}`;
+}
+
+// ─── CONFETTI ────────────────────────────────────────────────
+function launchConfetti() {
+  const colors = ["#00a86b", "#5b7cfa", "#f59e0b", "#e879f9", "#e53935", "#fff"];
+  const container = document.body;
+  for (let i = 0; i < 60; i++) {
+    const piece = document.createElement("div");
+    piece.className = "confetti-piece";
+    const color = colors[Math.floor(Math.random() * colors.length)];
+    piece.style.cssText = `
+      background:${color};
+      left:${Math.random() * 100}vw;
+      animation-duration:${2 + Math.random() * 1.5}s;
+      animation-delay:${Math.random() * 0.5}s;
+      width:${6 + Math.random() * 8}px;
+      height:${6 + Math.random() * 8}px;
+      border-radius:${Math.random() > 0.5 ? "50%" : "2px"};
+    `;
+    container.appendChild(piece);
+    setTimeout(() => piece.remove(), 3500);
+  }
 }
 
 function showToast(msg) {
@@ -525,7 +593,10 @@ function subscribeToUserBalance() {
       user.balance = fbBalance;
       localStorage.setItem("forecast_user", JSON.stringify(user));
       updateBalanceDisplay();
-      if (gained > 0) showToast(`+$${gained.toLocaleString()} payout credited!`);
+      if (gained > 0) {
+        showToast(`+$${gained.toLocaleString()} payout credited!`);
+        launchConfetti();
+      }
     }
   });
 }
@@ -621,9 +692,15 @@ function getCurrentProbs(marketId, market) {
   return toArray(market.baseProbs) || [50, 50];
 }
 
+window.onMarketSearch = function(val) {
+  marketSearch = val || "";
+  renderMarkets();
+};
+
 function renderMarkets() {
   const grid = document.getElementById("markets-grid");
-  let entries = Object.entries(allMarkets).filter(([, m]) => m.status !== "archived");
+  // Exclude archived and draft markets from user-facing view
+  let entries = Object.entries(allMarkets).filter(([, m]) => m.status !== "archived" && m.status !== "draft");
 
   // Build and show/hide category filter row
   const allCats = [...new Set(Object.values(allMarkets).filter(m => m.status !== "archived").map(m => m.category || "General"))];
@@ -650,6 +727,15 @@ function renderMarkets() {
   // Category filter
   if (categoryFilter !== "all") {
     entries = entries.filter(([, m]) => (m.category || "General") === categoryFilter);
+  }
+
+  // Search filter
+  if (marketSearch.trim()) {
+    const q = marketSearch.trim().toLowerCase();
+    entries = entries.filter(([, m]) =>
+      (m.title || "").toLowerCase().includes(q) ||
+      (m.category || "General").toLowerCase().includes(q)
+    );
   }
 
   entries = entries.sort((a, b) => {
@@ -844,6 +930,7 @@ window.openBetModal = function(marketId, optionIndex = 0) {
 
   document.getElementById("bet-overlay").classList.remove("hidden");
   updateBetModal();
+  subscribeToComments(marketId);
 
   // Apply insider block AFTER updateBetModal so the restricted message isn't overwritten
   const blocked       = isOpen && isInsiderBlocked(market.title, user.name, options);
@@ -983,12 +1070,14 @@ document.getElementById("bet-amount-input").addEventListener("input", (e) => {
   updateBetSummary();
 });
 
-document.getElementById("bet-close").addEventListener("click", () => {
+function closeBetOverlay() {
   document.getElementById("bet-overlay").classList.add("hidden");
-});
+  if (commentUnsubscribe) { commentUnsubscribe(); commentUnsubscribe = null; }
+}
+
+document.getElementById("bet-close").addEventListener("click", closeBetOverlay);
 document.getElementById("bet-overlay").addEventListener("click", (e) => {
-  if (e.target === document.getElementById("bet-overlay"))
-    document.getElementById("bet-overlay").classList.add("hidden");
+  if (e.target === document.getElementById("bet-overlay")) closeBetOverlay();
 });
 
 // ─── SUBMIT BET ──────────────────────────────────────────────
@@ -1057,7 +1146,7 @@ window.submitBet = async function() {
     probs: [...(marketCurrentProbs[activeBet.marketId] || probs)],
   });
 
-  document.getElementById("bet-overlay").classList.add("hidden");
+  closeBetOverlay();
   showToast(`Trade placed: ${optionLabel} on "${market.title.slice(0, 40)}"`);
   btn.disabled = false;
   btn.textContent = "Place Trade";
@@ -1155,6 +1244,7 @@ function subscribeToActivity() {
       .map(([key, bet]) => ({ key, bet }));
     renderActivityFeed();
     renderLeaderboard();
+    updatePortfolioDisplay();
   });
 }
 
@@ -1298,7 +1388,7 @@ function renderLeaderboard() {
       : `<div class="leaderboard-avatar">${getInitials(u.name || "?")}</div>`;
     const bal = (u.balance ?? 0).toLocaleString();
     return `
-      <div class="leaderboard-row${isMe ? " is-me" : ""}">
+      <div class="leaderboard-row${isMe ? " is-me" : ""}" onclick="openPlayerProfile('${uid}')">
         <div class="leaderboard-rank">${i + 1}</div>
         ${avatarEl}
         <div class="leaderboard-name">${escHtml(u.name || "Unknown")}${isMe ? " (you)" : ""}</div>
@@ -1331,6 +1421,140 @@ window.toggleReaction = async function(betKey, emoji) {
   }
 };
 
+
+// ─── COMMENTS ────────────────────────────────────────────────
+// NOTE: Firebase rule needed: "comments": { ".write": true }
+function subscribeToComments(marketId) {
+  if (commentUnsubscribe) { commentUnsubscribe(); commentUnsubscribe = null; }
+
+  const commentsRef = ref(db, `comments/${marketId}`);
+  const unsubscribe = onValue(commentsRef, (snap) => {
+    const data = snap.val() || {};
+    const comments = Object.values(data)
+      .sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0))
+      .slice(0, 20);
+
+    const listEl = document.getElementById("comments-list");
+    if (!listEl) return;
+
+    if (comments.length === 0) {
+      listEl.innerHTML = `<div class="comment-empty">No comments yet. Be the first!</div>`;
+      return;
+    }
+
+    listEl.innerHTML = comments.map(c => {
+      const avatarData = usersMap[c.userId]?.avatar;
+      const avatarEl = avatarData
+        ? `<div class="comment-avatar has-image" style="background-image:url(${avatarData})"></div>`
+        : `<div class="comment-avatar">${getInitials(c.userName || "?")}</div>`;
+      return `
+        <div class="comment-item">
+          ${avatarEl}
+          <div class="comment-body">
+            <span class="comment-author">${escHtml(c.userName || "Anonymous")}</span>
+            <span class="comment-text">${escHtml(c.text || "")}</span>
+            <span class="comment-time">${timeAgo(c.timestamp)}</span>
+          </div>
+        </div>`;
+    }).join("");
+  });
+
+  commentUnsubscribe = unsubscribe;
+}
+
+document.getElementById("comment-submit").addEventListener("click", submitComment);
+document.getElementById("comment-input").addEventListener("keydown", (e) => {
+  if (e.key === "Enter") submitComment();
+});
+
+async function submitComment() {
+  if (!user.id || !activeBet.marketId) return;
+  const inputEl = document.getElementById("comment-input");
+  const text = (inputEl.value || "").trim();
+  if (!text) return;
+  inputEl.value = "";
+  await push(ref(db, `comments/${activeBet.marketId}`), {
+    userId: user.id,
+    userName: user.name,
+    text,
+    timestamp: Date.now(),
+  });
+}
+
+// ─── PLAYER PROFILES ─────────────────────────────────────────
+window.openPlayerProfile = async function(uid) {
+  const u = usersMap[uid];
+  if (!u) return;
+
+  document.getElementById("player-profile-overlay").classList.remove("hidden");
+  document.getElementById("player-profile-name").textContent = u.name || "Unknown";
+  document.getElementById("player-profile-subtitle").textContent = `$${(u.balance ?? 0).toLocaleString()} balance`;
+  document.getElementById("player-profile-stats").innerHTML = `<div class="profile-stat"><div class="profile-stat-label">Loading...</div></div>`;
+  document.getElementById("player-profile-list").innerHTML = `<div class="history-empty">Loading...</div>`;
+
+  const snap = await get(ref(db, "bets"));
+  const allBets = snap.val() || {};
+
+  const userBets = Object.values(allBets)
+    .filter(b => b.userId === uid && b.marketId && !b.invalidated)
+    .sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
+
+  const total = userBets.length;
+  const resolvedBets = userBets.filter(b => {
+    const m = allMarkets[b.marketId];
+    return m && m.status === "resolved";
+  });
+  const wonBets = resolvedBets.filter(b => {
+    const m = allMarkets[b.marketId];
+    return m && Number(m.resolvedOptionIndex) === Number(b.optionIndex);
+  });
+  const winRate = resolvedBets.length > 0 ? Math.round((wonBets.length / resolvedBets.length) * 100) : 0;
+
+  let totalPL = 0;
+  resolvedBets.forEach(b => {
+    const m = allMarkets[b.marketId];
+    const won = m && Number(m.resolvedOptionIndex) === Number(b.optionIndex);
+    totalPL += won ? (b.payout || 0) - (b.amount || 0) : -(b.amount || 0);
+  });
+
+  document.getElementById("player-profile-stats").innerHTML = `
+    <div class="profile-stat"><div class="profile-stat-label">Trades</div><div class="profile-stat-value">${total}</div></div>
+    <div class="profile-stat"><div class="profile-stat-label">Win Rate</div><div class="profile-stat-value">${winRate}%</div></div>
+    <div class="profile-stat"><div class="profile-stat-label">P/L</div><div class="profile-stat-value" style="color:${totalPL >= 0 ? 'var(--yes)' : 'var(--no)'}">${totalPL >= 0 ? '+' : ''}$${totalPL.toLocaleString()}</div></div>
+  `;
+
+  const last20 = userBets.slice(0, 20);
+  if (last20.length === 0) {
+    document.getElementById("player-profile-list").innerHTML = `<div class="history-empty">No trades yet.</div>`;
+    return;
+  }
+
+  document.getElementById("player-profile-list").innerHTML = last20.map(bet => {
+    const market = allMarkets[bet.marketId];
+    const isResolved = market && market.status === "resolved";
+    const won = isResolved && Number(market.resolvedOptionIndex) === Number(bet.optionIndex);
+    const lost = isResolved && !won;
+    let statusClass = "history-status-pending", statusText = "Open", cashflow;
+    if (won)  { statusClass = "history-status-won";  statusText = "Won";  cashflow = `<span class="history-cf-win">+$${(bet.payout||0).toLocaleString()}</span>`; }
+    else if (lost) { statusClass = "history-status-lost"; statusText = "Lost"; cashflow = `<span class="history-cf-loss">-$${(bet.amount||0).toLocaleString()}</span>`; }
+    else { cashflow = `<span class="history-cf-neutral">-$${(bet.amount||0).toLocaleString()}</span>`; }
+    return `
+      <div class="history-row">
+        <div class="history-row-main">
+          <span class="history-status-pill ${statusClass}">${statusText}</span>
+          <div class="history-row-info">
+            <div class="history-row-title">${escHtml((bet.marketTitle || "").slice(0, 50))}</div>
+            <div class="history-row-detail">${escHtml(bet.option || "")} · $${(bet.amount||0).toLocaleString()} bet · ${timeAgo(bet.timestamp)}</div>
+          </div>
+        </div>
+        <div class="history-cf">${cashflow}</div>
+      </div>`;
+  }).join("");
+};
+
+window.closePlayerProfile = function() {
+  document.getElementById("player-profile-overlay").classList.add("hidden");
+};
 
 // ─── INIT ─────────────────────────────────────────────────────
 initUser();

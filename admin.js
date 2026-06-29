@@ -156,6 +156,74 @@ function subscribeToMarkets() {
   });
 }
 
+// ─── CSV IMPORT ───────────────────────────────────────────────
+// NOTE: CSV format: Title, Category, Close Date (YYYY-MM-DD), Close Time (HH:MM),
+//       Option 1, Prob 1 (%), Option 2, Prob 2 (%), ..., Option 5, Prob 5 (%)
+window.importCSV = function() {
+  const fileInput = document.createElement("input");
+  fileInput.type = "file";
+  fileInput.accept = ".csv,text/csv";
+  fileInput.style.display = "none";
+  document.body.appendChild(fileInput);
+  fileInput.click();
+  fileInput.addEventListener("change", async () => {
+    const file = fileInput.files[0];
+    if (!file) { fileInput.remove(); return; }
+    const text = await file.text();
+    fileInput.remove();
+
+    const lines = text.split(/\r?\n/);
+    // Skip header row
+    const rows = lines.slice(1).filter(l => l.trim());
+    let imported = 0;
+    const pushes = [];
+
+    for (const row of rows) {
+      // Simple CSV parse — handle quoted fields
+      const cols = [];
+      let cur = "", inQ = false;
+      for (let ci = 0; ci < row.length; ci++) {
+        const ch = row[ci];
+        if (ch === '"') { inQ = !inQ; }
+        else if (ch === ',' && !inQ) { cols.push(cur.trim()); cur = ""; }
+        else { cur += ch; }
+      }
+      cols.push(cur.trim());
+
+      const title = (cols[0] || "").replace(/^"|"$/g, "").trim();
+      if (!title) continue;
+
+      const category = (cols[1] || "General").replace(/^"|"$/g, "").trim();
+      const dateVal  = (cols[2] || "").replace(/^"|"$/g, "").trim();
+      const timeVal  = (cols[3] || "00:00").replace(/^"|"$/g, "").trim();
+      const closeDate = dateVal ? `${dateVal}T${timeVal || "00:00"}` : null;
+
+      const options = [], baseProbs = [];
+      for (let oi = 0; oi < 5; oi++) {
+        const name = (cols[4 + oi * 2] || "").replace(/^"|"$/g, "").trim();
+        const prob = parseFloat((cols[5 + oi * 2] || "").replace(/^"|"$/g, "")) || 0;
+        if (name && prob > 0) { options.push(name); baseProbs.push(prob); }
+      }
+
+      if (options.length < 2) continue;
+      const sum = baseProbs.reduce((s, p) => s + p, 0);
+      if (Math.abs(sum - 100) > 5) continue;
+
+      pushes.push(push(ref(db, "markets"), {
+        title, category, options, baseProbs,
+        closeDate: closeDate || null,
+        status: "open",
+        volume: 0,
+        createdAt: Date.now(),
+      }));
+      imported++;
+    }
+
+    await Promise.all(pushes);
+    showToast(`Imported ${imported} market${imported !== 1 ? "s" : ""}.`);
+  });
+};
+
 // ─── FILTER ───────────────────────────────────────────────────
 window.filterMarkets = function(filter) {
   currentFilter = filter;
@@ -170,7 +238,8 @@ function renderMarketList() {
   let entries = Object.entries(allMarkets);
 
   if (currentFilter === "open") {
-    entries = entries.filter(([, m]) => m.status === "open");
+    // Show open AND draft markets in the open tab
+    entries = entries.filter(([, m]) => m.status === "open" || m.status === "draft");
   } else if (currentFilter === "closed") {
     entries = entries.filter(([, m]) => m.status === "closed" || m.status === "resolved");
   } else if (currentFilter === "archived") {
@@ -192,18 +261,21 @@ function renderMarketList() {
 
   container.innerHTML = entries.map(([id, m]) => {
     const isOpen     = m.status === "open";
+    const isDraft    = m.status === "draft";
     const isResolved = m.status === "resolved";
     const isArchived = m.status === "archived";
+    const isInteractive = isOpen || isDraft;
     const options = m.options || ["YES", "NO"];
-    const statusLabel = isOpen ? "Open" : isResolved ? "Resolved" : isArchived ? "Archived" : "Closed";
-    const statusClass = isOpen ? "open" : isResolved ? "resolved" : isArchived ? "archived" : "closed";
+    const statusLabel = isDraft ? "Draft" : isOpen ? "Open" : isResolved ? "Resolved" : isArchived ? "Archived" : "Closed";
+    const statusClass = isDraft ? "draft" : isOpen ? "open" : isResolved ? "resolved" : isArchived ? "archived" : "closed";
     return `
-      <div class="admin-market-row ${isOpen ? "draggable-row" : "closed"}" data-id="${id}" ${isOpen ? 'draggable="true"' : ""}>
-        ${isOpen ? `<div class="drag-handle" title="Drag to reorder">⠿</div>` : ""}
+      <div class="admin-market-row ${isInteractive ? "draggable-row" : "closed"}" data-id="${id}" ${isInteractive ? 'draggable="true"' : ""}>
+        ${isInteractive ? `<div class="drag-handle" title="Drag to reorder">⠿</div>` : ""}
         <div>
           <div class="admin-market-meta">
             <span class="admin-market-category">${m.category || "General"}</span>
             <span class="market-status-pill ${statusClass}">${statusLabel}</span>
+            ${isDraft && m.publishAt ? `<span class="resolved-winner-pill">Publishes ${formatCloseDate(new Date(m.publishAt).toISOString())}</span>` : ""}
             ${isResolved || isArchived ? `<span class="resolved-winner-pill">Winner: ${m.resolvedOption}</span>` : ""}
           </div>
           <div class="admin-market-title">${m.title}</div>
@@ -218,11 +290,11 @@ function renderMarketList() {
         <div class="admin-market-actions">
           ${isArchived
             ? `<button class="admin-action-btn reopen" onclick="setStatus('${id}','resolved')">Unarchive</button>`
-            : !isOpen
+            : !isInteractive
               ? `<button class="admin-action-btn archive" onclick="archiveMarket('${id}')">Archive</button>`
               : `<button class="admin-action-btn edit" onclick="startEdit('${id}')">Edit</button>`
           }
-          ${isOpen
+          ${isInteractive
             ? `<button class="admin-action-btn close-market" onclick="setStatus('${id}','closed')">Close</button>`
             : !isResolved && !isArchived
               ? `<button class="admin-action-btn reopen" onclick="setStatus('${id}','open')">Reopen</button>
@@ -294,6 +366,11 @@ window.saveMarket = async function() {
   const timeVal = document.getElementById("f-closetime").value;
   const closeDate = dateVal ? `${dateVal}T${timeVal || "00:00"}` : null;
 
+  // Scheduled publish date
+  const pubDateVal = document.getElementById("f-publishdate").value;
+  const pubTimeVal = document.getElementById("f-publishtime").value;
+  const publishAt = pubDateVal ? new Date(`${pubDateVal}T${pubTimeVal || "00:00"}`).getTime() : null;
+
   const options = [], baseProbs = [];
   document.querySelectorAll(".option-row").forEach(row => {
     const name = row.querySelector(".opt-name").value.trim();
@@ -313,7 +390,14 @@ window.saveMarket = async function() {
   btn.disabled = true;
   btn.textContent = "Saving...";
 
-  const data = { title, category: category || "General", options, baseProbs, closeDate: closeDate || null, status: "open" };
+  // If a future publish date is set, save as draft; otherwise open
+  const status = (publishAt && publishAt > Date.now()) ? "draft" : "open";
+  const data = {
+    title, category: category || "General", options, baseProbs,
+    closeDate: closeDate || null,
+    status,
+    ...(publishAt ? { publishAt } : {}),
+  };
 
   if (id) {
     const existing = allMarkets[id] || {};
@@ -329,7 +413,7 @@ window.saveMarket = async function() {
   resetForm();
   btn.disabled = false;
   btn.textContent = id ? "Save Changes" : "Create Market";
-  showToast(id ? "Market updated." : "Market created.");
+  showToast(id ? "Market updated." : (status === "draft" ? "Market saved as draft." : "Market created."));
 };
 
 window.startEdit = function(id) {
@@ -342,6 +426,21 @@ window.startEdit = function(id) {
   const [cdDate, cdTime] = (m.closeDate || "").split("T");
   document.getElementById("f-closedate").value = cdDate || "";
   document.getElementById("f-closetime").value = cdTime || "";
+
+  // Populate publish date if market is a draft
+  if (m.publishAt) {
+    const pubDate = new Date(m.publishAt);
+    const yyyy = pubDate.getFullYear();
+    const mm   = String(pubDate.getMonth() + 1).padStart(2, "0");
+    const dd   = String(pubDate.getDate()).padStart(2, "0");
+    const hh   = String(pubDate.getHours()).padStart(2, "0");
+    const min  = String(pubDate.getMinutes()).padStart(2, "0");
+    document.getElementById("f-publishdate").value = `${yyyy}-${mm}-${dd}`;
+    document.getElementById("f-publishtime").value = `${hh}:${min}`;
+  } else {
+    document.getElementById("f-publishdate").value = "";
+    document.getElementById("f-publishtime").value = "";
+  }
 
   const options   = m.options   || ["YES", "NO"];
   const baseProbs = m.baseProbs || [50, 50];
@@ -377,6 +476,8 @@ function resetForm() {
   document.getElementById("f-category").value = "";
   document.getElementById("f-closedate").value = "";
   document.getElementById("f-closetime").value = "";
+  document.getElementById("f-publishdate").value = "";
+  document.getElementById("f-publishtime").value = "";
 
   document.getElementById("options-list").innerHTML = `
     <div class="option-row" data-index="0">

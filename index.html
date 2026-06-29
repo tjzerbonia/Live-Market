@@ -34,6 +34,11 @@
         <img src="kalshi_800.png" alt="Kalshi" />
       </div>
       <div class="header-right">
+        <button class="theme-toggle-btn" id="theme-toggle" onclick="toggleTheme()" title="Toggle dark mode">Dark</button>
+        <div class="portfolio-pill" id="portfolio-pill">
+          <span class="balance-label">Portfolio</span>
+          <span class="portfolio-amount" id="portfolio-amount">$1,000</span>
+        </div>
         <div class="balance-pill" id="balance-pill" onclick="openHistory()" title="View trade history">
           <span class="balance-label">Balance</span>
           <span class="balance-amount" id="user-balance">$1,000</span>
@@ -65,6 +70,9 @@
 
     <!-- Markets tab -->
     <div id="tab-markets">
+      <div class="market-search-row">
+        <input type="text" id="market-search-input" class="market-search-input" placeholder="Search markets..." autocomplete="off" oninput="onMarketSearch(this.value)" />
+      </div>
       <div class="market-filter-row">
         <button class="market-filter-btn" data-filter="all" onclick="setMarketFilter('all')">All</button>
         <button class="market-filter-btn active" data-filter="open" onclick="setMarketFilter('open')">Open</button>
@@ -135,6 +143,30 @@
       </div>
       <div class="bet-summary" id="bet-summary"></div>
       <button class="submit-bet-btn" id="submit-bet-btn" onclick="submitBet()">Place Trade</button>
+      <div class="comments-section" id="comments-section">
+        <div class="comments-list" id="comments-list"></div>
+        <div class="comment-input-row">
+          <input type="text" id="comment-input" placeholder="Add a comment..." maxlength="200" autocomplete="off" />
+          <button id="comment-submit">Post</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Player Profile overlay -->
+  <div id="player-profile-overlay" class="overlay hidden" onclick="if(event.target===this)closePlayerProfile()">
+    <div class="history-panel">
+      <div class="history-header">
+        <div>
+          <div class="history-title" id="player-profile-name">Player</div>
+          <div class="history-subtitle" id="player-profile-subtitle"></div>
+        </div>
+        <button class="modal-close" onclick="closePlayerProfile()">&#x2715;</button>
+      </div>
+      <div class="player-profile-stats" id="player-profile-stats"></div>
+      <div class="history-list" id="player-profile-list">
+        <div class="history-empty">Loading...</div>
+      </div>
     </div>
   </div>
 
