@@ -1412,6 +1412,50 @@ main {
 /* === Draft status pill === */
 .market-status-pill.draft { background: rgba(245,158,11,0.12); color: #f59e0b; }
 
+/* === Win Modal === */
+.win-modal {
+  text-align: center;
+  max-width: 360px;
+}
+.win-modal-emoji {
+  font-size: 2.5rem;
+  line-height: 1;
+}
+.win-bets-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 0.6rem 0.75rem;
+  text-align: left;
+  margin-top: -0.25rem;
+}
+.win-bet-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.8rem;
+}
+.win-bet-market {
+  flex: 1;
+  color: var(--text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.win-bet-option {
+  font-weight: 700;
+  color: var(--yes);
+  white-space: nowrap;
+}
+.win-bet-payout {
+  font-weight: 700;
+  color: var(--yes);
+  white-space: nowrap;
+}
+
 /* === Responsive === */
 @media (max-width: 600px) {
   .header-inner {

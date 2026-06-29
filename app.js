@@ -568,6 +568,7 @@ function subscribeToConfig() {
 
 // Listen for admin-credited balance increases (bet payouts)
 function subscribeToUserBalance() {
+  let firstLoad = true;
   onValue(ref(db, `users/${user.id}/balance`), (snap) => {
     const fbBalance = snap.val();
     if (fbBalance == null) return;
@@ -576,12 +577,55 @@ function subscribeToUserBalance() {
       user.balance = fbBalance;
       localStorage.setItem("forecast_user", JSON.stringify(user));
       updateBalanceDisplay();
-      if (gained > 0) {
-        showToast(`+$${gained.toLocaleString()} payout credited!`);
+      if (gained > 0 && !firstLoad) {
         launchConfetti();
+        showWinModal(gained);
       }
     }
+    firstLoad = false;
   });
+}
+
+async function showWinModal(gained) {
+  // Find the bets that just paid out — resolved markets where user picked the winner
+  const snap = await get(ref(db, "bets"));
+  const allBets = snap.val() || {};
+  const winningBets = Object.values(allBets).filter(b => {
+    if (b.userId !== user.id || b.invalidated) return false;
+    const m = allMarkets[b.marketId];
+    if (!m || m.status !== "resolved") return false;
+    return Number(m.resolvedOptionIndex) === Number(b.optionIndex);
+  });
+
+  // Remove any existing win modal
+  document.getElementById("win-modal-overlay")?.remove();
+
+  const overlay = document.createElement("div");
+  overlay.id = "win-modal-overlay";
+  overlay.className = "overlay";
+  overlay.style.zIndex = "300";
+
+  const betRows = winningBets.slice(0, 5).map(b => `
+    <div class="win-bet-row">
+      <span class="win-bet-market">${escHtml((b.marketTitle || "").slice(0, 45))}</span>
+      <span class="win-bet-option">${escHtml(b.option)}</span>
+      <span class="win-bet-payout">+$${(b.payout || 0).toLocaleString()}</span>
+    </div>`).join("");
+
+  overlay.innerHTML = `
+    <div class="modal win-modal">
+      <button class="modal-close" id="win-modal-close">&#x2715;</button>
+      <div class="win-modal-emoji">🏆</div>
+      <h2>You cashed out!</h2>
+      <p>+$${gained.toLocaleString()} Schmeckles landed in your account.</p>
+      ${betRows ? `<div class="win-bets-list">${betRows}</div>` : ""}
+      <button class="submit-bet-btn" id="win-modal-ok">Let's go!</button>
+    </div>`;
+
+  document.body.appendChild(overlay);
+  overlay.querySelector("#win-modal-close").addEventListener("click", () => overlay.remove());
+  overlay.querySelector("#win-modal-ok").addEventListener("click", () => overlay.remove());
+  overlay.addEventListener("click", e => { if (e.target === overlay) overlay.remove(); });
 }
 
 // ─── FIREBASE SUBSCRIPTIONS ──────────────────────────────────

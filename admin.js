@@ -159,6 +159,45 @@ function subscribeToMarkets() {
 // ─── CSV IMPORT ───────────────────────────────────────────────
 // NOTE: CSV format: Title, Category, Close Date (YYYY-MM-DD), Close Time (HH:MM),
 //       Option 1, Prob 1 (%), Option 2, Prob 2 (%), ..., Option 5, Prob 5 (%)
+
+function parseCSVRow(row) {
+  const cols = [];
+  let cur = "", inQ = false;
+  for (let ci = 0; ci < row.length; ci++) {
+    const ch = row[ci];
+    if (ch === '"') { inQ = !inQ; }
+    else if (ch === ',' && !inQ) { cols.push(cur.trim()); cur = ""; }
+    else { cur += ch; }
+  }
+  cols.push(cur.trim());
+  return cols;
+}
+
+function parseCSVMarkets(text) {
+  const lines = text.split(/\r?\n/);
+  const parsed = [], skipped = [];
+  lines.slice(1).filter(l => l.trim()).forEach((row, ri) => {
+    const cols = parseCSVRow(row);
+    const title = (cols[0] || "").replace(/^"|"$/g, "").trim();
+    if (!title) return;
+    const category = (cols[1] || "General").replace(/^"|"$/g, "").trim();
+    const dateVal  = (cols[2] || "").replace(/^"|"$/g, "").trim();
+    const timeVal  = (cols[3] || "00:00").replace(/^"|"$/g, "").trim();
+    const closeDate = dateVal ? `${dateVal}T${timeVal || "00:00"}` : null;
+    const options = [], baseProbs = [];
+    for (let oi = 0; oi < 5; oi++) {
+      const name = (cols[4 + oi * 2] || "").replace(/^"|"$/g, "").trim();
+      const prob = parseFloat((cols[5 + oi * 2] || "").replace(/^"|"$/g, "")) || 0;
+      if (name && prob > 0) { options.push(name); baseProbs.push(prob); }
+    }
+    if (options.length < 2) { skipped.push({ title, reason: "fewer than 2 options" }); return; }
+    const sum = baseProbs.reduce((s, p) => s + p, 0);
+    if (Math.abs(sum - 100) > 5) { skipped.push({ title, reason: `probs sum to ${Math.round(sum)}%` }); return; }
+    parsed.push({ title, category, options, baseProbs, closeDate });
+  });
+  return { parsed, skipped };
+}
+
 window.importCSV = function() {
   const fileInput = document.createElement("input");
   fileInput.type = "file";
@@ -171,58 +210,68 @@ window.importCSV = function() {
     if (!file) { fileInput.remove(); return; }
     const text = await file.text();
     fileInput.remove();
-
-    const lines = text.split(/\r?\n/);
-    // Skip header row
-    const rows = lines.slice(1).filter(l => l.trim());
-    let imported = 0;
-    const pushes = [];
-
-    for (const row of rows) {
-      // Simple CSV parse — handle quoted fields
-      const cols = [];
-      let cur = "", inQ = false;
-      for (let ci = 0; ci < row.length; ci++) {
-        const ch = row[ci];
-        if (ch === '"') { inQ = !inQ; }
-        else if (ch === ',' && !inQ) { cols.push(cur.trim()); cur = ""; }
-        else { cur += ch; }
-      }
-      cols.push(cur.trim());
-
-      const title = (cols[0] || "").replace(/^"|"$/g, "").trim();
-      if (!title) continue;
-
-      const category = (cols[1] || "General").replace(/^"|"$/g, "").trim();
-      const dateVal  = (cols[2] || "").replace(/^"|"$/g, "").trim();
-      const timeVal  = (cols[3] || "00:00").replace(/^"|"$/g, "").trim();
-      const closeDate = dateVal ? `${dateVal}T${timeVal || "00:00"}` : null;
-
-      const options = [], baseProbs = [];
-      for (let oi = 0; oi < 5; oi++) {
-        const name = (cols[4 + oi * 2] || "").replace(/^"|"$/g, "").trim();
-        const prob = parseFloat((cols[5 + oi * 2] || "").replace(/^"|"$/g, "")) || 0;
-        if (name && prob > 0) { options.push(name); baseProbs.push(prob); }
-      }
-
-      if (options.length < 2) continue;
-      const sum = baseProbs.reduce((s, p) => s + p, 0);
-      if (Math.abs(sum - 100) > 5) continue;
-
-      pushes.push(push(ref(db, "markets"), {
-        title, category, options, baseProbs,
-        closeDate: closeDate || null,
-        status: "open",
-        volume: 0,
-        createdAt: Date.now(),
-      }));
-      imported++;
-    }
-
-    await Promise.all(pushes);
-    showToast(`Imported ${imported} market${imported !== 1 ? "s" : ""}.`);
+    const { parsed, skipped } = parseCSVMarkets(text);
+    showCSVPreview(parsed, skipped);
   });
 };
+
+function showCSVPreview(parsed, skipped) {
+  // Remove existing preview if any
+  document.getElementById("csv-preview-modal")?.remove();
+
+  const overlay = document.createElement("div");
+  overlay.id = "csv-preview-modal";
+  overlay.className = "csv-preview-overlay";
+
+  const okRows = parsed.map(m => `
+    <div class="csv-preview-row ok">
+      <span class="csv-preview-title">${m.title}</span>
+      <span class="csv-preview-meta">${m.category} · ${m.options.join(", ")} · ${m.closeDate ? "Closes " + m.closeDate.split("T")[0] : "No close date"}</span>
+    </div>`).join("");
+
+  const skipRows = skipped.map(s => `
+    <div class="csv-preview-row skip">
+      <span class="csv-preview-title">⚠ ${s.title}</span>
+      <span class="csv-preview-meta">${s.reason}</span>
+    </div>`).join("");
+
+  overlay.innerHTML = `
+    <div class="csv-preview-panel">
+      <div class="csv-preview-header">
+        <h3>Import Preview</h3>
+        <button class="modal-close" id="csv-close-btn">&#x2715;</button>
+      </div>
+      <div class="csv-preview-summary">
+        <strong>${parsed.length}</strong> market${parsed.length !== 1 ? "s" : ""} ready to import
+        ${skipped.length ? `· <span style="color:#f59e0b">${skipped.length} skipped</span>` : ""}
+      </div>
+      <div class="csv-preview-list">
+        ${okRows}
+        ${skipRows}
+      </div>
+      <div class="csv-preview-actions">
+        <button class="admin-action-btn" id="csv-cancel-btn">Cancel</button>
+        <button class="admin-action-btn resolve" id="csv-confirm-btn" ${parsed.length === 0 ? "disabled" : ""}>
+          Import ${parsed.length} Market${parsed.length !== 1 ? "s" : ""}
+        </button>
+      </div>
+    </div>`;
+
+  document.body.appendChild(overlay);
+
+  overlay.querySelector("#csv-close-btn").addEventListener("click", () => overlay.remove());
+  overlay.querySelector("#csv-cancel-btn").addEventListener("click", () => overlay.remove());
+  overlay.querySelector("#csv-confirm-btn").addEventListener("click", async () => {
+    const btn = overlay.querySelector("#csv-confirm-btn");
+    btn.disabled = true;
+    btn.textContent = "Importing...";
+    await Promise.all(parsed.map(m => push(ref(db, "markets"), {
+      ...m, status: "open", volume: 0, createdAt: Date.now(),
+    })));
+    overlay.remove();
+    showToast(`Imported ${parsed.length} market${parsed.length !== 1 ? "s" : ""}.`);
+  });
+}
 
 // ─── FILTER ───────────────────────────────────────────────────
 window.filterMarkets = function(filter) {
