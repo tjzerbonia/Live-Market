@@ -130,34 +130,53 @@
 
   <!-- ─── AMERICAN ODDS ─────────────────────────────────────── -->
   <div class="guide-section">
-    <h2>American odds — the only number that matters</h2>
-    <p>All sportsbook bets use American odds. Here's what the numbers mean:</p>
-    <div class="odds-grid">
+    <h2>American odds — read this first</h2>
+
+    <p>American odds are just a way of saying <strong>how much you win for every $100 you bet</strong>. There are only two types: negative and positive.</p>
+
+    <div class="odds-grid" style="margin-bottom:1.25rem">
       <div class="odds-card">
         <div class="odds-value neg">-150</div>
-        <p><strong>Negative = favorite.</strong><br>
-        You bet $150 to win $100 profit.<br>
-        The bigger the number, the bigger the favorite.</p>
+        <p><strong>Negative = the favorite.</strong><br><br>
+        You have to risk MORE than $100 to win $100.<br><br>
+        <strong>-150 means: bet $150, win $100 profit.</strong><br><br>
+        Think of it as: the minus sign tells you what you have to put in to get $100 back out.</p>
       </div>
       <div class="odds-card">
         <div class="odds-value pos">+130</div>
-        <p><strong>Positive = underdog.</strong><br>
-        You bet $100 to win $130 profit.<br>
-        The bigger the number, the bigger the underdog.</p>
-      </div>
-      <div class="odds-card">
-        <div class="odds-value neg">-110</div>
-        <p><strong>Standard juice.</strong><br>
-        Used on almost every spread and total.<br>
-        Both sides are usually -110.</p>
-      </div>
-      <div class="odds-card">
-        <div class="odds-value pos">+100</div>
-        <p><strong>Even money.</strong><br>
-        Bet $100, win $100.<br>
-        Rare — only use if intentional.</p>
+        <p><strong>Positive = the underdog.</strong><br><br>
+        You risk $100 and win MORE than $100.<br><br>
+        <strong>+130 means: bet $100, win $130 profit.</strong><br><br>
+        Think of it as: the plus sign tells you what you get back for every $100 you put in.</p>
       </div>
     </div>
+
+    <h3>The one number you'll use constantly</h3>
+    <div class="odds-card" style="margin-bottom:1rem">
+      <div class="odds-value neg" style="font-size:2rem">-110</div>
+      <p>This is called <strong>standard juice</strong> (or "the vig"). It's the default for almost every spread and total bet. Both sides get -110.<br><br>
+      It means: bet $110 to win $100. The house keeps $10 as their cut.<br><br>
+      <strong>When in doubt, use -110 on both sides.</strong></p>
+    </div>
+
+    <h3>Quick cheat sheet</h3>
+    <table class="col-table">
+      <thead><tr><th>Odds</th><th>What it means in plain English</th><th>Bet $100, you win...</th></tr></thead>
+      <tbody>
+        <tr><td class="col-example" style="color:var(--no)">-200</td><td>Heavy favorite. You're almost expected to win.</td><td>$50 profit</td></tr>
+        <tr><td class="col-example" style="color:var(--no)">-150</td><td>Solid favorite.</td><td>$67 profit</td></tr>
+        <tr><td class="col-example" style="color:var(--no)">-110</td><td>Standard juice. Slight edge to the house.</td><td>$91 profit</td></tr>
+        <tr><td class="col-example">+100</td><td>Perfectly even. No favorite.</td><td>$100 profit</td></tr>
+        <tr><td class="col-example" style="color:var(--yes)">+130</td><td>Mild underdog.</td><td>$130 profit</td></tr>
+        <tr><td class="col-example" style="color:var(--yes)">+200</td><td>Big underdog. Unlikely to win.</td><td>$200 profit</td></tr>
+        <tr><td class="col-example" style="color:var(--yes)">+500</td><td>Major longshot.</td><td>$500 profit</td></tr>
+      </tbody>
+    </table>
+
+    <h3>The one rule to never forget</h3>
+    <p style="font-size:1rem;line-height:1.7;background:var(--bg);border-left:3px solid var(--accent);padding:0.75rem 1rem;border-radius:0 var(--radius-sm) var(--radius-sm) 0;margin:0">
+      <strong>Negative numbers always need the minus sign.</strong> If you type <code>150</code> instead of <code>-150</code>, the importer thinks it's a +150 underdog, not a -150 favorite. That's the most common mistake.
+    </p>
   </div>
 
   <hr />
