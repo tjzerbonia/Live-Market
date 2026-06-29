@@ -13,10 +13,9 @@ import {
 const db = getDatabase(getApp());
 
 // ─── STATE ────────────────────────────────────────────────────
-let allSbMarkets          = {};
-let parlayLegs            = [];   // [{ marketId, marketTitle, side, odds, subtype, sideLabel }]
-let sbFilter              = "open"; // "open" | "closed" | "all"
-let pendingParlayMarketId = null;  // marketId waiting for side selection in the slip
+let allSbMarkets = {};
+let parlayLegs   = [];   // [{ marketId, marketTitle, subtype, side, sideLabel, odds }] — side may be null until picked
+let sbFilter     = "open"; // "open" | "closed" | "all"
 
 // ─── ODDS HELPERS ─────────────────────────────────────────────
 function americanToDecimal(odds) {
@@ -108,8 +107,7 @@ function buildSbCard(id, m) {
   const disabledAttr = isOpen ? "" : "disabled";
 
   // Determine which side is in the parlay (for visual feedback)
-  const addedLeg  = parlayLegs.find(l => l.marketId === id);
-  const isPending = pendingParlayMarketId === id;
+  const addedLeg = parlayLegs.find(l => l.marketId === id);
 
   let sidesHtml = "";
   let parlayBtnHtml = "";
@@ -150,13 +148,9 @@ function buildSbCard(id, m) {
   }
 
   if (isOpen) {
-    if (addedLeg) {
-      parlayBtnHtml = `<button class="sb-parlay-btn added" disabled>In Parlay</button>`;
-    } else if (isPending) {
-      parlayBtnHtml = `<button class="sb-parlay-btn pending" disabled>Pick a side ↓</button>`;
-    } else {
-      parlayBtnHtml = `<button class="sb-parlay-btn" onclick="openParlayForMarket('${id}')">+ Parlay</button>`;
-    }
+    parlayBtnHtml = addedLeg
+      ? `<button class="sb-parlay-btn added" disabled>In Parlay</button>`
+      : `<button class="sb-parlay-btn" onclick="addToParlay('${id}')">+ Parlay</button>`;
   }
 
   return `
@@ -329,7 +323,10 @@ window.placeSbBet = async function() {
 };
 
 // ─── PARLAY ───────────────────────────────────────────────────
-window.openParlayForMarket = function(marketId) {
+// Legs may have side: null until the user picks inside the slip.
+// { marketId, marketTitle, subtype, side, sideLabel, odds }
+
+window.addToParlay = function(marketId) {
   const user = getCurrentUser();
   if (!user || !user.id) { showSbToast("Please set your name first."); return; }
 
@@ -337,7 +334,7 @@ window.openParlayForMarket = function(marketId) {
   if (!m || m.status !== "open") return;
 
   if (parlayLegs.find(l => l.marketId === marketId)) {
-    showSbToast("This market is already in your parlay.");
+    showSbToast("Already in your parlay.");
     return;
   }
   if (parlayLegs.length >= 8) {
@@ -345,58 +342,33 @@ window.openParlayForMarket = function(marketId) {
     return;
   }
 
-  pendingParlayMarketId = marketId;
+  // Add with no side chosen yet
+  parlayLegs.push({ marketId, marketTitle: m.title, subtype: m.subtype || "moneyline", side: null, sideLabel: null, odds: null });
 
-  renderParlaySlip();
+  const slip = document.getElementById("parlay-slip");
+  if (slip) slip.classList.add("visible");
+
   renderSbMarkets();
-};
-
-window.confirmParlayLeg = function(side) {
-  if (!pendingParlayMarketId) return;
-  const id = pendingParlayMarketId;
-  pendingParlayMarketId = null;
-  addToParlay(id, side);
-};
-
-window.cancelParlayPending = function() {
-  pendingParlayMarketId = null;
   renderParlaySlip();
-  renderSbMarkets();
 };
 
-window.addToParlay = function(marketId, side) {
-  const user = getCurrentUser();
-  if (!user || !user.id) { showSbToast("Please set your name first."); return; }
+// Called from inside the slip when user picks a side for leg at index i
+window.pickLegSide = function(idx, side) {
+  const leg = parlayLegs[idx];
+  if (!leg) return;
+  const m = allSbMarkets[leg.marketId];
+  if (!m) return;
 
-  const m = allSbMarkets[marketId];
-  if (!m || m.status !== "open") return;
-
-  // One leg per market
-  if (parlayLegs.find(l => l.marketId === marketId)) {
-    showSbToast("Already added this market to your parlay. Remove it first.");
-    return;
-  }
-
-  if (parlayLegs.length >= 8) {
-    showSbToast("Max 8 legs in a parlay.");
-    return;
-  }
-
-  const subtype = m.subtype || "moneyline";
-  let sideLabel = side;
-  let odds = -110;
-
-  if (subtype === "total") {
-    if (side === "over") { sideLabel = `Over ${m.line ?? ""}`; odds = m.overOdds ?? -110; }
-    else                 { sideLabel = `Under ${m.line ?? ""}`; odds = m.underOdds ?? -110; }
+  if (leg.subtype === "total") {
+    leg.side      = side;
+    leg.sideLabel = side === "over" ? `Over ${m.line ?? ""}` : `Under ${m.line ?? ""}`;
+    leg.odds      = side === "over" ? (m.overOdds ?? -110) : (m.underOdds ?? -110);
   } else {
-    if (side === "A") { sideLabel = m.sideA?.label || "Side A"; odds = m.sideA?.odds ?? -110; }
-    else              { sideLabel = m.sideB?.label || "Side B"; odds = m.sideB?.odds ?? -110; }
+    leg.side      = side;
+    leg.sideLabel = side === "A" ? (m.sideA?.label || "Side A") : (m.sideB?.label || "Side B");
+    leg.odds      = side === "A" ? (m.sideA?.odds ?? -110) : (m.sideB?.odds ?? -110);
   }
 
-  parlayLegs.push({ marketId, marketTitle: m.title, side, sideLabel, odds, subtype });
-  showSbToast(`Added to parlay: ${sideLabel}`);
-  renderSbMarkets();
   renderParlaySlip();
 };
 
@@ -419,79 +391,70 @@ window.toggleParlaySlip = function() {
 };
 
 function calcParlayMultiplier() {
-  return parlayLegs.reduce((prod, leg) => prod * americanToDecimal(leg.odds), 1);
+  // Only multiply legs that have a side chosen
+  return parlayLegs
+    .filter(l => l.odds !== null)
+    .reduce((prod, leg) => prod * americanToDecimal(leg.odds), 1);
 }
 
 function renderParlaySlip() {
   const slip = document.getElementById("parlay-slip");
   if (!slip) return;
 
-  const count      = parlayLegs.length;
-  const hasPending = !!pendingParlayMarketId;
-
-  // Update tab label — show a hint when a side selection is waiting
+  const count = parlayLegs.length;
   const countEl = document.getElementById("parlay-count");
   if (countEl) countEl.textContent = count;
-  const hintEl = document.getElementById("parlay-tab-hint");
-  if (hintEl) hintEl.textContent = hasPending ? " · Tap to pick side" : "";
 
-  if (count === 0 && !hasPending) {
+  if (count === 0) {
     slip.classList.remove("visible");
     return;
   }
   slip.classList.add("visible");
-  // Only auto-expand when legs exist — pending state keeps slip collapsed
-  if (count > 0 && slip.classList.contains("collapsed")) {
-    // leave collapsed; user opens manually
-  }
 
-  // Side picker for pending market
-  let pendingHtml = "";
-  if (hasPending) {
-    const pm = allSbMarkets[pendingParlayMarketId];
-    if (pm) {
+  const allSidesChosen = parlayLegs.every(l => l.side !== null);
+
+  // Build legs list — side picker inline for un-chosen legs
+  const legsList = document.getElementById("parlay-legs-list");
+  legsList.innerHTML = parlayLegs.map((leg, i) => {
+    if (leg.side === null) {
+      const m = allSbMarkets[leg.marketId];
+      if (!m) return "";
       let sideButtons = "";
-      if (pm.subtype === "total") {
+      if (leg.subtype === "total") {
         sideButtons = `
-          <button class="parlay-side-pick-btn" onclick="confirmParlayLeg('over')">Over ${pm.line ?? ""} &nbsp;<span class="parlay-pick-odds">${fmtOdds(pm.overOdds ?? -110)}</span></button>
-          <button class="parlay-side-pick-btn" onclick="confirmParlayLeg('under')">Under ${pm.line ?? ""} &nbsp;<span class="parlay-pick-odds">${fmtOdds(pm.underOdds ?? -110)}</span></button>`;
+          <button class="parlay-side-pick-btn" onclick="pickLegSide(${i},'over')">Over ${m.line ?? ""} <span class="parlay-pick-odds">${fmtOdds(m.overOdds ?? -110)}</span></button>
+          <button class="parlay-side-pick-btn" onclick="pickLegSide(${i},'under')">Under ${m.line ?? ""} <span class="parlay-pick-odds">${fmtOdds(m.underOdds ?? -110)}</span></button>`;
       } else {
-        const sA = pm.sideA || {};
-        const sB = pm.sideB || {};
-        const spreadA = pm.subtype === "spread" && sA.spread ? ` ${sA.spread}` : "";
-        const spreadB = pm.subtype === "spread" && sB.spread ? ` ${sB.spread}` : "";
+        const sA = m.sideA || {}, sB = m.sideB || {};
+        const spA = leg.subtype === "spread" && sA.spread ? ` ${sA.spread}` : "";
+        const spB = leg.subtype === "spread" && sB.spread ? ` ${sB.spread}` : "";
         sideButtons = `
-          <button class="parlay-side-pick-btn" onclick="confirmParlayLeg('A')">${escHtml(sA.label || "Side A")}${spreadA} &nbsp;<span class="parlay-pick-odds">${fmtOdds(sA.odds ?? -110)}</span></button>
-          <button class="parlay-side-pick-btn" onclick="confirmParlayLeg('B')">${escHtml(sB.label || "Side B")}${spreadB} &nbsp;<span class="parlay-pick-odds">${fmtOdds(sB.odds ?? -110)}</span></button>`;
+          <button class="parlay-side-pick-btn" onclick="pickLegSide(${i},'A')">${escHtml(sA.label || "Side A")}${spA} <span class="parlay-pick-odds">${fmtOdds(sA.odds ?? -110)}</span></button>
+          <button class="parlay-side-pick-btn" onclick="pickLegSide(${i},'B')">${escHtml(sB.label || "Side B")}${spB} <span class="parlay-pick-odds">${fmtOdds(sB.odds ?? -110)}</span></button>`;
       }
-      pendingHtml = `
-        <div class="parlay-pending-picker">
-          <div class="parlay-pending-label">Pick a side to add:</div>
-          <div class="parlay-pending-market">${escHtml((pm.title || "").slice(0, 55))}</div>
-          <div class="parlay-pending-sides">${sideButtons}</div>
-          <button class="parlay-pending-cancel" onclick="cancelParlayPending()">Cancel</button>
+      return `
+        <div class="parlay-leg-row parlay-leg-unpicked">
+          <div class="parlay-leg-info">
+            <div class="parlay-leg-title">${escHtml((leg.marketTitle || "").slice(0, 50))}</div>
+            <div class="parlay-pending-sides">${sideButtons}</div>
+          </div>
+          <button class="parlay-remove-btn" onclick="removeParlayLeg(${i})" title="Remove">&#x2715;</button>
         </div>`;
     }
-  }
+    return `
+      <div class="parlay-leg-row">
+        <div class="parlay-leg-info">
+          <div class="parlay-leg-title">${escHtml((leg.marketTitle || "").slice(0, 50))}</div>
+          <div class="parlay-leg-side">${escHtml(leg.sideLabel)}</div>
+        </div>
+        <div class="parlay-leg-odds">${fmtOdds(leg.odds)}</div>
+        <button class="parlay-remove-btn" onclick="removeParlayLeg(${i})" title="Remove">&#x2715;</button>
+      </div>`;
+  }).join("");
 
-  // Legs list
-  const legsList = document.getElementById("parlay-legs-list");
-  legsList.innerHTML = pendingHtml + parlayLegs.map((leg, i) => `
-    <div class="parlay-leg-row">
-      <div class="parlay-leg-info">
-        <div class="parlay-leg-title">${escHtml((leg.marketTitle || "").slice(0, 50))}</div>
-        <div class="parlay-leg-side">${escHtml(leg.sideLabel)}</div>
-      </div>
-      <div class="parlay-leg-odds">${fmtOdds(leg.odds)}</div>
-      <button class="parlay-remove-btn" onclick="removeParlayLeg(${i})" title="Remove">&#x2715;</button>
-    </div>`).join("");
-
-  // Combined odds display in tab
-  if (count > 0) {
-    const multiplier = calcParlayMultiplier();
-    const tabOdds = document.getElementById("parlay-slip-odds-display");
-    if (tabOdds) tabOdds.textContent = `${multiplier.toFixed(2)}x`;
-  }
+  // Tab multiplier — only when all sides chosen
+  const tabOdds = document.getElementById("parlay-slip-odds-display");
+  if (tabOdds) tabOdds.textContent = allSidesChosen && count > 1 ? `${calcParlayMultiplier().toFixed(2)}x` : "";
 
   updateParlayPayout();
 }
@@ -501,13 +464,17 @@ function updateParlayPayout() {
   const payEl   = document.getElementById("parlay-payout-display");
   if (!stakeEl || !payEl) return;
 
-  const stake = parseFloat(stakeEl.value) || 0;
-  const mult  = calcParlayMultiplier();
-
-  if (stake <= 0 || parlayLegs.length === 0) {
-    payEl.innerHTML = "Enter stake to see potential payout";
+  const allSidesChosen = parlayLegs.every(l => l.side !== null);
+  if (!allSidesChosen || parlayLegs.length < 2) {
+    payEl.innerHTML = parlayLegs.length < 2
+      ? "Add at least 2 legs"
+      : "Pick a side for each leg above";
     return;
   }
+
+  const stake = parseFloat(stakeEl.value) || 0;
+  const mult  = calcParlayMultiplier();
+  if (stake <= 0) { payEl.innerHTML = "Enter stake to see potential payout"; return; }
 
   const payout = (stake * mult).toFixed(2);
   const profit = (payout - stake).toFixed(2);
@@ -519,6 +486,7 @@ window.placeParlayBet = async function() {
   if (!user || !user.id) { showSbToast("Please log in first."); return; }
 
   if (parlayLegs.length < 2) { showSbToast("A parlay needs at least 2 legs."); return; }
+  if (parlayLegs.some(l => l.side === null)) { showSbToast("Pick a side for every leg first."); return; }
 
   const stakeEl = document.getElementById("parlay-stake");
   const stake   = parseFloat(stakeEl.value);
@@ -615,7 +583,7 @@ function injectParlaySlip() {
   slip.className = "parlay-slip collapsed";
   slip.innerHTML = `
     <div class="parlay-slip-tab" onclick="toggleParlaySlip()">
-      <span>Parlay (<span id="parlay-count">0</span>)<span id="parlay-tab-hint" class="parlay-tab-hint"></span></span>
+      <span>Parlay (<span id="parlay-count">0</span>)</span>
       <span class="parlay-slip-odds" id="parlay-slip-odds-display"></span>
     </div>
     <div class="parlay-slip-body">

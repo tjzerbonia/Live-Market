@@ -219,15 +219,9 @@
 }
 .parlay-pending-cancel:hover { color: var(--no); }
 
-.parlay-tab-hint {
-  font-size: 0.72rem;
-  font-weight: 600;
-  color: var(--accent);
-  animation: parlay-hint-pulse 1.2s ease-in-out infinite;
-}
-@keyframes parlay-hint-pulse {
-  0%, 100% { opacity: 1; }
-  50%       { opacity: 0.4; }
+.parlay-leg-unpicked {
+  border-left: 2px solid var(--accent);
+  padding-left: 0.5rem;
 }
 
 .sb-parlay-btn {
