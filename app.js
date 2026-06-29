@@ -233,23 +233,6 @@ function updateBalanceDisplay() {
   const el = document.getElementById("user-balance");
   el.textContent = `$${user.balance.toLocaleString()}`;
   el.style.color = user.balance < 0 ? "var(--no)" : "";
-  updatePortfolioDisplay();
-}
-
-function updatePortfolioDisplay() {
-  const el = document.getElementById("portfolio-amount");
-  if (!el) return;
-  // Sum open (non-invalidated, non-resolved) bet amounts by current user
-  let openBetSum = 0;
-  cachedActivityBets.forEach(({ bet }) => {
-    if (bet.userId !== user.id) return;
-    if (bet.invalidated) return;
-    const market = allMarkets[bet.marketId];
-    if (!market || market.status === "resolved") return;
-    openBetSum += (bet.amount || 0);
-  });
-  const total = user.balance + openBetSum;
-  el.textContent = `$${total.toLocaleString()}`;
 }
 
 // ─── CONFETTI ────────────────────────────────────────────────
@@ -1244,7 +1227,6 @@ function subscribeToActivity() {
       .map(([key, bet]) => ({ key, bet }));
     renderActivityFeed();
     renderLeaderboard();
-    updatePortfolioDisplay();
   });
 }
 
@@ -1365,7 +1347,16 @@ async function renderHistory() {
   }).join("");
 
   const net = totalWon - totalLost;
-  subtitleEl.innerHTML = `${myBets.length} trades · Net: <strong style="color:${net >= 0 ? 'var(--yes)' : 'var(--no)'}">${net >= 0 ? '+' : ''}$${net.toLocaleString()}</strong>`;
+  // Portfolio = balance + open bet amounts
+  let openBetSum = 0;
+  Object.values(allBets).forEach(b => {
+    if (b.userId !== user.id || b.invalidated) return;
+    const m = allMarkets[b.marketId];
+    if (!m || m.status === "resolved") return;
+    openBetSum += (b.amount || 0);
+  });
+  const portfolio = user.balance + openBetSum;
+  subtitleEl.innerHTML = `${myBets.length} trades · Net: <strong style="color:${net >= 0 ? 'var(--yes)' : 'var(--no)'}">${net >= 0 ? '+' : ''}$${net.toLocaleString()}</strong> · Portfolio: <strong>$${portfolio.toLocaleString()}</strong>`;
   listEl.innerHTML = rows;
 }
 
