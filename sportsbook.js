@@ -96,9 +96,14 @@ window.renderSbMarkets = function() {
 };
 
 function buildSbCard(id, m) {
-  const isOpen   = m.status === "open";
-  const subtype  = m.subtype || "moneyline";
-  const statusBadge = `<span class="sb-status-badge ${isOpen ? "open" : "closed"}">${isOpen ? "Open" : "Closed"}</span>`;
+  const isOpen     = m.status === "open";
+  const isResolved = m.status === "resolved";
+  const subtype    = m.subtype || "moneyline";
+  const statusLabel = isOpen ? "Open" : isResolved ? "Resolved" : "Closed";
+  const statusBadge = `<span class="sb-status-badge ${isOpen ? "open" : isResolved ? "resolved" : "closed"}">${statusLabel}</span>`;
+  const winnerBadge = isResolved && m.resolvedLabel
+    ? `<span class="sb-winner-badge">Winner: ${escHtml(m.resolvedLabel)}</span>`
+    : "";
   const disabledAttr = isOpen ? "" : "disabled";
 
   // Determine which side is in the parlay (for visual feedback)
@@ -160,6 +165,7 @@ function buildSbCard(id, m) {
         ${statusBadge}
       </div>
       <div class="sb-card-title">${escHtml(m.title || "")}</div>
+      ${winnerBadge}
       <div class="sb-sides">
         ${sidesHtml}
       </div>

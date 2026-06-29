@@ -59,6 +59,21 @@
   background: rgba(0,0,0,0.05);
   color: var(--text-dim);
 }
+.sb-status-badge.resolved {
+  background: var(--accent-dim, rgba(99,102,241,0.12));
+  color: var(--accent);
+}
+
+.sb-winner-badge {
+  display: inline-block;
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: var(--yes);
+  background: var(--yes-dim);
+  border-radius: var(--radius-pill);
+  padding: 0.2rem 0.65rem;
+  margin-bottom: 0.6rem;
+}
 
 .sb-card-title {
   font-size: 0.975rem;

@@ -1227,7 +1227,7 @@ function renderSbMarketList() {
 
   let entries = Object.entries(allSbMarkets);
   if (sbAdminFilter === "open")   entries = entries.filter(([, m]) => m.status === "open");
-  if (sbAdminFilter === "closed") entries = entries.filter(([, m]) => m.status === "closed");
+  if (sbAdminFilter === "closed") entries = entries.filter(([, m]) => m.status === "closed" || m.status === "resolved");
 
   entries.sort((a, b) => (b[1].createdAt || 0) - (a[1].createdAt || 0));
 
@@ -1237,9 +1237,10 @@ function renderSbMarketList() {
   }
 
   container.innerHTML = entries.map(([id, m]) => {
-    const isOpen  = m.status === "open";
-    const statusClass = isOpen ? "open" : "closed";
-    const statusLabel = isOpen ? "Open" : "Closed";
+    const isOpen     = m.status === "open";
+    const isResolved = m.status === "resolved";
+    const statusClass = isOpen ? "open" : isResolved ? "resolved" : "closed";
+    const statusLabel = isOpen ? "Open" : isResolved ? "Resolved" : "Closed";
 
     let sidesInfo = "";
     if (m.subtype === "total") {
@@ -1251,20 +1252,25 @@ function renderSbMarketList() {
     }
 
     return `
-      <div class="admin-market-row${isOpen ? "" : " closed"}">
+      <div class="admin-market-row${isOpen ? "" : " closed"}" data-sb-id="${id}">
         <div>
           <div class="admin-market-meta">
             <span class="admin-market-category">${m.category || "General"}</span>
             <span class="market-status-pill ${statusClass}">${statusLabel}</span>
             <span style="font-size:0.65rem;color:var(--text-dim);font-weight:600;text-transform:uppercase">${m.subtype || "moneyline"}</span>
+            ${isResolved ? `<span class="resolved-winner-pill">Winner: ${m.resolvedLabel || m.resolvedSide || ""}</span>` : ""}
           </div>
           <div class="admin-market-title">${m.title || ""}</div>
           <div class="admin-market-stats">${sidesInfo} · Vol: $${(m.volume || 0).toLocaleString()}</div>
         </div>
         <div class="admin-market-actions">
-          ${isOpen
-            ? `<button class="admin-action-btn close-market" onclick="setSbMarketStatus('${id}','closed')">Close</button>`
-            : `<button class="admin-action-btn reopen"       onclick="setSbMarketStatus('${id}','open')">Reopen</button>`
+          ${isResolved
+            ? ""
+            : isOpen
+              ? `<button class="admin-action-btn close-market" onclick="setSbMarketStatus('${id}','closed')">Close</button>
+                 <button class="admin-action-btn resolve" onclick="showSbResolveOptions('${id}')">Resolve</button>`
+              : `<button class="admin-action-btn reopen" onclick="setSbMarketStatus('${id}','open')">Reopen</button>
+                 <button class="admin-action-btn resolve" onclick="showSbResolveOptions('${id}')">Resolve</button>`
           }
           <button class="admin-action-btn delete" onclick="deleteSbMarket('${id}')">Delete</button>
         </div>
@@ -1276,6 +1282,120 @@ function renderSbMarketList() {
 window.setSbMarketStatus = async function(id, status) {
   await update(ref(db, `sb_markets/${id}`), { status });
   showToast(status === "open" ? "Sportsbook market reopened." : "Sportsbook market closed.");
+};
+
+// ─── RESOLVE SPORTSBOOK ───────────────────────────────────────
+window.showSbResolveOptions = function(id) {
+  const existing = document.getElementById(`sb-resolve-picker-${id}`);
+  if (existing) { existing.remove(); return; }
+
+  const m = allSbMarkets[id];
+  if (!m) return;
+
+  let sides;
+  if (m.subtype === "total") {
+    sides = [
+      { label: `Over ${m.line ?? ""}`, key: "over" },
+      { label: `Under ${m.line ?? ""}`, key: "under" },
+    ];
+  } else {
+    sides = [
+      { label: m.sideA?.label || "Side A", key: "A" },
+      { label: m.sideB?.label || "Side B", key: "B" },
+    ];
+  }
+
+  const picker = document.createElement("div");
+  picker.id = `sb-resolve-picker-${id}`;
+  picker.className = "resolve-picker";
+  picker.innerHTML = `
+    <div class="resolve-picker-label">Which side won?</div>
+    <div class="resolve-picker-options">
+      ${sides.map(s => `<button class="resolve-option-btn">${s.label}</button>`).join("")}
+    </div>
+    <button class="resolve-cancel-btn" onclick="document.getElementById('sb-resolve-picker-${id}').remove()">Cancel</button>
+  `;
+  const btns = picker.querySelectorAll(".resolve-option-btn");
+  sides.forEach((s, i) => {
+    btns[i].addEventListener("click", () => resolveSbMarket(id, s.key, s.label));
+  });
+
+  const row = document.querySelector(`.admin-market-row[data-sb-id="${id}"]`);
+  if (row) row.after(picker);
+};
+
+window.resolveSbMarket = async function(id, winningSideKey, winningSideLabel) {
+  const m = allSbMarkets[id];
+  if (!m) return;
+
+  if (!confirm(`Resolve "${m.title}"\n\nWinner: "${winningSideLabel}"\n\nThis will pay out all winning bets. Cannot be undone.`)) return;
+
+  const picker = document.getElementById(`sb-resolve-picker-${id}`);
+  if (picker) picker.remove();
+
+  const updates = {};
+
+  // Mark market resolved
+  updates[`sb_markets/${id}/status`]        = "resolved";
+  updates[`sb_markets/${id}/resolvedSide`]  = winningSideKey;
+  updates[`sb_markets/${id}/resolvedLabel`] = winningSideLabel;
+  updates[`sb_markets/${id}/resolvedAt`]    = Date.now();
+
+  // Tally individual sb_bet payouts
+  const sbBetsSnap = await get(ref(db, "sb_bets"));
+  const allSbBets  = sbBetsSnap.val() || {};
+  const payouts = {};
+  Object.values(allSbBets).forEach(bet => {
+    if (bet.marketId !== id) return;
+    if (bet.invalidated) return;
+    if (bet.side !== winningSideKey) return;
+    payouts[bet.userId] = (payouts[bet.userId] || 0) + (bet.payout || 0);
+  });
+
+  // Handle parlays — void losers, pay out fully-settled winners
+  const parlaysSnap    = await get(ref(db, "parlays"));
+  const allParlays     = parlaysSnap.val() || {};
+  const sbMktSnap      = await get(ref(db, "sb_markets"));
+  const latestSbMkts   = sbMktSnap.val() || {};
+  // Apply the pending resolution so all-legs checks reflect the new state
+  latestSbMkts[id] = { ...latestSbMkts[id], status: "resolved", resolvedSide: winningSideKey };
+
+  Object.entries(allParlays).forEach(([parlayKey, parlay]) => {
+    if (parlay.voided || parlay.paid) return;
+    const legs = parlay.legs || [];
+    const leg  = legs.find(l => l.marketId === id);
+    if (!leg) return;
+
+    if (leg.side !== winningSideKey) {
+      // Wrong pick — void the entire parlay
+      updates[`parlays/${parlayKey}/voided`] = true;
+      return;
+    }
+
+    // Correct pick — check if every leg's market is now resolved and won
+    const allWon = legs.every(l => {
+      const mkt = latestSbMkts[l.marketId];
+      return mkt && mkt.status === "resolved" && mkt.resolvedSide === l.side;
+    });
+
+    if (allWon) {
+      payouts[parlay.userId] = (payouts[parlay.userId] || 0) + (parlay.payout || 0);
+      updates[`parlays/${parlayKey}/paid`] = true;
+    }
+  });
+
+  // Credit winner balances
+  for (const [userId, payout] of Object.entries(payouts)) {
+    const balSnap = await get(ref(db, `users/${userId}/balance`));
+    const cur     = balSnap.val() ?? 1000;
+    updates[`users/${userId}/balance`] = cur + payout;
+  }
+
+  await update(ref(db), updates);
+
+  const count = Object.keys(payouts).length;
+  const total = Object.values(payouts).reduce((s, p) => s + p, 0);
+  showToast(`Resolved: "${winningSideLabel}" wins. $${total.toLocaleString()} paid to ${count} player(s).`);
 };
 
 window.deleteSbMarket = async function(id) {
