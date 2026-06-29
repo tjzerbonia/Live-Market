@@ -1,0 +1,342 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>CSV Import Guide</title>
+  <link rel="stylesheet" href="style.css" />
+  <style>
+    body { padding: 2rem 1rem; max-width: 860px; margin: 0 auto; }
+    h1 { font-size: 1.4rem; margin-bottom: 0.25rem; }
+    h2 { font-size: 1rem; font-weight: 700; margin: 2rem 0 0.6rem; color: var(--text); }
+    h3 { font-size: 0.85rem; font-weight: 700; color: var(--text-muted); text-transform: uppercase;
+         letter-spacing: 0.05em; margin: 1.5rem 0 0.5rem; }
+    p  { color: var(--text-muted); font-size: 0.9rem; line-height: 1.6; margin: 0.4rem 0 0.75rem; }
+
+    .back-link { font-size: 0.8rem; color: var(--text-dim); text-decoration: none; }
+    .back-link:hover { color: var(--accent); }
+
+    /* Section cards */
+    .guide-section {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 1.5rem;
+      margin-bottom: 1.5rem;
+    }
+    .guide-section h2 { margin-top: 0; font-size: 1.05rem; }
+
+    /* Column layout table */
+    .col-table { width: 100%; border-collapse: collapse; font-size: 0.82rem; margin: 0.75rem 0; }
+    .col-table th {
+      text-align: left; padding: 0.4rem 0.6rem;
+      background: var(--bg-elevated, var(--bg));
+      color: var(--text-muted);
+      font-weight: 600; font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.04em;
+      border-bottom: 1px solid var(--border);
+    }
+    .col-table td { padding: 0.45rem 0.6rem; border-bottom: 1px solid var(--border); color: var(--text); vertical-align: top; }
+    .col-table tr:last-child td { border-bottom: none; }
+    .col-table td.col-num { color: var(--text-dim); font-size: 0.75rem; white-space: nowrap; }
+    .col-table td.col-blank { color: var(--text-dim); font-style: italic; }
+    .col-table td.col-example { font-family: monospace; color: var(--accent); }
+
+    /* CSV code block */
+    .csv-block {
+      background: var(--bg, #0f1117);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm, 6px);
+      padding: 1rem 1.25rem;
+      font-family: monospace;
+      font-size: 0.8rem;
+      color: var(--text);
+      overflow-x: auto;
+      white-space: pre;
+      margin: 0.75rem 0;
+      line-height: 1.7;
+    }
+    .csv-block .csv-comment { color: var(--text-dim); }
+    .csv-block .csv-key    { color: var(--accent); }
+    .csv-block .csv-blank  { color: var(--text-dim); }
+    .csv-block .csv-odds-neg { color: var(--no); }
+    .csv-block .csv-odds-pos { color: var(--yes); }
+
+    /* Odds explainer */
+    .odds-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-top: 0.5rem; }
+    @media (max-width: 600px) { .odds-grid { grid-template-columns: 1fr; } }
+    .odds-card {
+      background: var(--bg, #0f1117);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm, 6px);
+      padding: 1rem 1.25rem;
+    }
+    .odds-card .odds-value { font-size: 1.4rem; font-weight: 800; margin-bottom: 0.3rem; }
+    .odds-card .odds-value.neg { color: var(--no); }
+    .odds-card .odds-value.pos { color: var(--yes); }
+    .odds-card p { margin: 0; font-size: 0.82rem; }
+
+    /* Pill tags */
+    .tag {
+      display: inline-block; font-size: 0.68rem; font-weight: 700; letter-spacing: 0.04em;
+      text-transform: uppercase; padding: 0.15rem 0.5rem; border-radius: 99px;
+      margin-right: 0.3rem; vertical-align: middle;
+    }
+    .tag.required { background: var(--no-dim, rgba(232,84,84,0.12)); color: var(--no); }
+    .tag.optional { background: rgba(0,0,0,0.05); color: var(--text-dim); }
+    .tag.sb       { background: var(--accent-dim, rgba(99,102,241,0.12)); color: var(--accent); }
+
+    /* Download link */
+    .download-row { display: flex; gap: 0.75rem; flex-wrap: wrap; margin-top: 1rem; }
+    .download-btn {
+      display: inline-block; padding: 0.55rem 1.1rem; border-radius: var(--radius-sm, 6px);
+      font-size: 0.82rem; font-weight: 600; text-decoration: none; cursor: pointer;
+      background: var(--accent); color: #fff; border: none;
+    }
+    .download-btn:hover { opacity: 0.88; }
+    .download-btn.secondary {
+      background: transparent; color: var(--text-muted);
+      border: 1px solid var(--border);
+    }
+
+    hr { border: none; border-top: 1px solid var(--border); margin: 2rem 0; }
+  </style>
+</head>
+<body>
+
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1.5rem">
+    <div>
+      <a href="admin.html" class="back-link">← Back to Admin</a>
+      <h1 style="margin-top:0.25rem">CSV Import Guide</h1>
+      <p style="margin:0">How to format your spreadsheet before importing markets.</p>
+    </div>
+  </div>
+
+  <!-- ─── OVERVIEW ──────────────────────────────────────────── -->
+  <div class="guide-section">
+    <h2>The basics</h2>
+    <p>
+      One spreadsheet handles <strong>both</strong> prediction markets and sportsbook bets.
+      The <strong>first column</strong> tells the importer which type each row is:
+    </p>
+    <table class="col-table">
+      <thead><tr><th>First column value</th><th>What it creates</th></tr></thead>
+      <tbody>
+        <tr><td class="col-example">sportsbook</td><td>A Book Bets market (moneyline, spread, or total)</td></tr>
+        <tr><td><em style="color:var(--text-dim)">anything else</em></td><td>A regular prediction market (YES/NO or multi-option)</td></tr>
+      </tbody>
+    </table>
+    <p>The header row is required. You can mix both types in the same file.</p>
+  </div>
+
+  <!-- ─── AMERICAN ODDS ─────────────────────────────────────── -->
+  <div class="guide-section">
+    <h2>American odds — the only number that matters</h2>
+    <p>All sportsbook bets use American odds. Here's what the numbers mean:</p>
+    <div class="odds-grid">
+      <div class="odds-card">
+        <div class="odds-value neg">-150</div>
+        <p><strong>Negative = favorite.</strong><br>
+        You bet $150 to win $100 profit.<br>
+        The bigger the number, the bigger the favorite.</p>
+      </div>
+      <div class="odds-card">
+        <div class="odds-value pos">+130</div>
+        <p><strong>Positive = underdog.</strong><br>
+        You bet $100 to win $130 profit.<br>
+        The bigger the number, the bigger the underdog.</p>
+      </div>
+      <div class="odds-card">
+        <div class="odds-value neg">-110</div>
+        <p><strong>Standard juice.</strong><br>
+        Used on almost every spread and total.<br>
+        Both sides are usually -110.</p>
+      </div>
+      <div class="odds-card">
+        <div class="odds-value pos">+100</div>
+        <p><strong>Even money.</strong><br>
+        Bet $100, win $100.<br>
+        Rare — only use if intentional.</p>
+      </div>
+    </div>
+  </div>
+
+  <hr />
+
+  <!-- ─── MONEYLINE ─────────────────────────────────────────── -->
+  <div class="guide-section">
+    <h2>Moneyline <span class="tag sb">sportsbook</span></h2>
+    <p>Who wins outright. Just two teams, each with their own odds.</p>
+
+    <h3>Column order</h3>
+    <table class="col-table">
+      <thead><tr><th>#</th><th>Column name</th><th>Example</th><th>Notes</th></tr></thead>
+      <tbody>
+        <tr><td class="col-num">A (1)</td><td>Type</td><td class="col-example">sportsbook</td><td>Always exactly this word</td></tr>
+        <tr><td class="col-num">B (2)</td><td>Category</td><td class="col-example">NFL</td><td></td></tr>
+        <tr><td class="col-num">C (3)</td><td>Title</td><td class="col-example">Bears vs Packers</td><td></td></tr>
+        <tr><td class="col-num">D (4)</td><td>Subtype</td><td class="col-example">moneyline</td><td>Always lowercase</td></tr>
+        <tr><td class="col-num">E (5)</td><td>Side A Label</td><td class="col-example">Bears</td><td>Team name</td></tr>
+        <tr><td class="col-num">F (6)</td><td>Side A Spread</td><td class="col-blank">leave blank</td><td>Moneyline has no spread</td></tr>
+        <tr><td class="col-num">G (7)</td><td>Side A Odds</td><td class="col-example">-150</td><td>Negative = favorite</td></tr>
+        <tr><td class="col-num">H (8)</td><td>Side B Label</td><td class="col-example">Packers</td><td>Team name</td></tr>
+        <tr><td class="col-num">I (9)</td><td>Side B Spread</td><td class="col-blank">leave blank</td><td></td></tr>
+        <tr><td class="col-num">J (10)</td><td>Side B Odds</td><td class="col-example">+120</td><td>Positive = underdog</td></tr>
+        <tr><td class="col-num">K–M (11–13)</td><td>Line / Over / Under</td><td class="col-blank">leave blank</td><td>For totals only</td></tr>
+      </tbody>
+    </table>
+
+    <h3>Example CSV row</h3>
+    <div class="csv-block">type,Category,Title,Subtype,SideA,SideA_Spread,SideA_Odds,SideB,SideB_Spread,SideB_Odds,Line,OverOdds,UnderOdds
+
+sportsbook,NFL,Bears vs Packers,moneyline,Bears,,<span class="csv-odds-neg">-150</span>,Packers,,<span class="csv-odds-pos">+120</span>,,,</div>
+  </div>
+
+  <!-- ─── SPREAD ────────────────────────────────────────────── -->
+  <div class="guide-section">
+    <h2>Spread <span class="tag sb">sportsbook</span></h2>
+    <p>
+      The favorite gives points, the underdog gets points.
+      Almost always both sides are priced at -110.
+    </p>
+
+    <h3>Column order</h3>
+    <table class="col-table">
+      <thead><tr><th>#</th><th>Column name</th><th>Example</th><th>Notes</th></tr></thead>
+      <tbody>
+        <tr><td class="col-num">A (1)</td><td>Type</td><td class="col-example">sportsbook</td><td></td></tr>
+        <tr><td class="col-num">B (2)</td><td>Category</td><td class="col-example">NFL</td><td></td></tr>
+        <tr><td class="col-num">C (3)</td><td>Title</td><td class="col-example">Bears vs Packers</td><td></td></tr>
+        <tr><td class="col-num">D (4)</td><td>Subtype</td><td class="col-example">spread</td><td>Always lowercase</td></tr>
+        <tr><td class="col-num">E (5)</td><td>Side A Label</td><td class="col-example">Bears</td><td>Team name</td></tr>
+        <tr><td class="col-num">F (6)</td><td>Side A Spread</td><td class="col-example">-3.5</td><td>Favorite gets negative number</td></tr>
+        <tr><td class="col-num">G (7)</td><td>Side A Odds</td><td class="col-example">-110</td><td>Almost always -110</td></tr>
+        <tr><td class="col-num">H (8)</td><td>Side B Label</td><td class="col-example">Packers</td><td>Team name</td></tr>
+        <tr><td class="col-num">I (9)</td><td>Side B Spread</td><td class="col-example">+3.5</td><td>Underdog gets positive number</td></tr>
+        <tr><td class="col-num">J (10)</td><td>Side B Odds</td><td class="col-example">-110</td><td>Almost always -110</td></tr>
+        <tr><td class="col-num">K–M (11–13)</td><td>Line / Over / Under</td><td class="col-blank">leave blank</td><td></td></tr>
+      </tbody>
+    </table>
+
+    <h3>Example CSV row</h3>
+    <div class="csv-block">type,Category,Title,Subtype,SideA,SideA_Spread,SideA_Odds,SideB,SideB_Spread,SideB_Odds,Line,OverOdds,UnderOdds
+
+sportsbook,NFL,Bears vs Packers,spread,Bears,<span class="csv-odds-neg">-3.5</span>,<span class="csv-odds-neg">-110</span>,Packers,<span class="csv-odds-pos">+3.5</span>,<span class="csv-odds-neg">-110</span>,,,</div>
+  </div>
+
+  <!-- ─── TOTAL ─────────────────────────────────────────────── -->
+  <div class="guide-section">
+    <h2>Total (Over/Under) <span class="tag sb">sportsbook</span></h2>
+    <p>
+      Will the combined score be over or under a set number?
+      Side A and B labels are not needed — the importer creates "Over X" and "Under X" automatically.
+    </p>
+
+    <h3>Column order</h3>
+    <table class="col-table">
+      <thead><tr><th>#</th><th>Column name</th><th>Example</th><th>Notes</th></tr></thead>
+      <tbody>
+        <tr><td class="col-num">A (1)</td><td>Type</td><td class="col-example">sportsbook</td><td></td></tr>
+        <tr><td class="col-num">B (2)</td><td>Category</td><td class="col-example">NFL</td><td></td></tr>
+        <tr><td class="col-num">C (3)</td><td>Title</td><td class="col-example">Bears vs Packers Total Points</td><td></td></tr>
+        <tr><td class="col-num">D (4)</td><td>Subtype</td><td class="col-example">total</td><td>Always lowercase</td></tr>
+        <tr><td class="col-num">E–J (5–10)</td><td>Side labels &amp; spreads</td><td class="col-blank">leave blank</td><td>Not used for totals</td></tr>
+        <tr><td class="col-num">K (11)</td><td>Line</td><td class="col-example">47.5</td><td>The total score number</td></tr>
+        <tr><td class="col-num">L (12)</td><td>Over Odds</td><td class="col-example">-110</td><td></td></tr>
+        <tr><td class="col-num">M (13)</td><td>Under Odds</td><td class="col-example">-110</td><td></td></tr>
+      </tbody>
+    </table>
+
+    <h3>Example CSV row</h3>
+    <div class="csv-block">type,Category,Title,Subtype,SideA,SideA_Spread,SideA_Odds,SideB,SideB_Spread,SideB_Odds,Line,OverOdds,UnderOdds
+
+sportsbook,NFL,Bears vs Packers Total Points,total,,,,,,,<span class="csv-odds-pos">47.5</span>,<span class="csv-odds-neg">-110</span>,<span class="csv-odds-neg">-110</span></div>
+  </div>
+
+  <!-- ─── PREDICTION MARKETS ───────────────────────────────── -->
+  <div class="guide-section">
+    <h2>Prediction markets (YES/NO and multi-option)</h2>
+    <p>Use the same spreadsheet — just don't put "sportsbook" in column A. The header row must be present.</p>
+
+    <h3>Column order</h3>
+    <table class="col-table">
+      <thead><tr><th>#</th><th>Column name</th><th>Example</th><th>Notes</th></tr></thead>
+      <tbody>
+        <tr><td class="col-num">A (1)</td><td>Title</td><td class="col-example">Will the Bears make the playoffs?</td><td></td></tr>
+        <tr><td class="col-num">B (2)</td><td>Category</td><td class="col-example">NFL</td><td></td></tr>
+        <tr><td class="col-num">C (3)</td><td>Close Date</td><td class="col-example">2026-01-10</td><td>YYYY-MM-DD format</td></tr>
+        <tr><td class="col-num">D (4)</td><td>Close Time</td><td class="col-example">12:00</td><td>HH:MM, 24-hour</td></tr>
+        <tr><td class="col-num">E (5)</td><td>Option 1 Name</td><td class="col-example">YES</td><td></td></tr>
+        <tr><td class="col-num">F (6)</td><td>Option 1 Probability</td><td class="col-example">40</td><td>Must add up to 100 across all options</td></tr>
+        <tr><td class="col-num">G–N (7–14)</td><td>Options 2–5 (Name + Prob)</td><td class="col-example">NO, 60</td><td>Add pairs for each additional option</td></tr>
+      </tbody>
+    </table>
+
+    <h3>Example CSV rows (binary + multi-option)</h3>
+    <div class="csv-block">Title,Category,Close Date (YYYY-MM-DD),Close Time (HH:MM),Option 1,Prob 1 (%),Option 2,Prob 2 (%),Option 3,Prob 3 (%),Option 4,Prob 4 (%),Option 5,Prob 5 (%)
+
+Will the Bears make the playoffs?,NFL,2026-01-10,12:00,YES,40,NO,60,,,,,,
+Who wins the race?,BIX 7,2026-07-25,08:00,Nick,25,TJ,25,Jake,25,Sam,25,,</div>
+  </div>
+
+  <!-- ─── FULL MIXED EXAMPLE ───────────────────────────────── -->
+  <div class="guide-section">
+    <h2>Full mixed file example</h2>
+    <p>Prediction markets and sportsbook bets in one file. The header row is shared.</p>
+    <div class="csv-block">Title,Category,Close Date (YYYY-MM-DD),Close Time (HH:MM),Option 1,Prob 1 (%),Option 2,Prob 2 (%),Option 3,Prob 3 (%),Option 4,Prob 4 (%),Option 5,Prob 5 (%)
+Will it rain on July 4th?,Weather,2026-07-04,06:00,YES,30,NO,70,,,,,,
+sportsbook,NFL,Bears vs Packers,moneyline,Bears,,<span class="csv-odds-neg">-150</span>,Packers,,<span class="csv-odds-pos">+120</span>,,,
+sportsbook,NFL,Bears vs Packers,spread,Bears,<span class="csv-odds-neg">-3.5</span>,<span class="csv-odds-neg">-110</span>,Packers,<span class="csv-odds-pos">+3.5</span>,<span class="csv-odds-neg">-110</span>,,,
+sportsbook,NFL,Bears vs Packers Total Points,total,,,,,,,<span class="csv-odds-pos">47.5</span>,<span class="csv-odds-neg">-110</span>,<span class="csv-odds-neg">-110</span></div>
+  </div>
+
+  <!-- ─── COMMON MISTAKES ──────────────────────────────────── -->
+  <div class="guide-section">
+    <h2>Common mistakes</h2>
+    <table class="col-table">
+      <thead><tr><th>Mistake</th><th>Fix</th></tr></thead>
+      <tbody>
+        <tr><td>Odds written as <code>150</code> instead of <code>-150</code></td><td>Always include the minus sign for favorites</td></tr>
+        <tr><td>Odds written as <code>+110</code> when you mean <code>-110</code></td><td>Standard juice is negative: <code>-110</code></td></tr>
+        <tr><td><code>Sportsbook</code> with capital S</td><td>Must be lowercase: <code>sportsbook</code></td></tr>
+        <tr><td>Subtype written as <code>Over/Under</code></td><td>Must be exactly <code>total</code></td></tr>
+        <tr><td>Probabilities don't add up to 100</td><td>Prediction market rows are skipped if probs don't sum to 100</td></tr>
+        <tr><td>Missing the header row</td><td>First row must always be the column names</td></tr>
+        <tr><td>Total odds entered in the wrong columns</td><td>For totals: Line in col K, Over in col L, Under in col M</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- ─── DOWNLOAD TEMPLATE ────────────────────────────────── -->
+  <div class="guide-section">
+    <h2>Download a template</h2>
+    <p>Click below to download a pre-formatted CSV with one example of each type.</p>
+    <div class="download-row">
+      <button class="download-btn" onclick="downloadTemplate()">Download CSV Template</button>
+      <a href="admin.html" class="download-btn secondary">Back to Admin</a>
+    </div>
+  </div>
+
+  <script>
+    // Apply saved theme
+    const savedTheme = localStorage.getItem("forecast_theme");
+    if (savedTheme) document.documentElement.setAttribute("data-theme", savedTheme);
+
+    function downloadTemplate() {
+      const csv = [
+        "Title,Category,Close Date (YYYY-MM-DD),Close Time (HH:MM),Option 1,Prob 1 (%),Option 2,Prob 2 (%),Option 3,Prob 3 (%),Option 4,Prob 4 (%),Option 5,Prob 5 (%)",
+        "Will the Bears make the playoffs?,NFL,2026-01-10,12:00,YES,40,NO,60,,,,,,",
+        "Who wins the race?,BIX 7,2026-07-25,08:00,Nick,25,TJ,25,Jake,25,Sam,25,,",
+        "sportsbook,NFL,Bears vs Packers,moneyline,Bears,,-150,Packers,,+120,,,",
+        "sportsbook,NFL,Bears vs Packers,spread,Bears,-3.5,-110,Packers,+3.5,-110,,,",
+        "sportsbook,NFL,Bears vs Packers Total Points,total,,,,,,,47.5,-110,-110",
+      ].join("\n");
+
+      const blob = new Blob([csv], { type: "text/csv" });
+      const a = document.createElement("a");
+      a.href = URL.createObjectURL(blob);
+      a.download = "market-template.csv";
+      a.click();
+    }
+  </script>
+</body>
+</html>
