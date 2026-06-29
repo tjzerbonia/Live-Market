@@ -527,7 +527,7 @@ function buildChart(history, options, W, H, PAD, strokeW, dotR, showAll, thinFac
 }
 
 function renderSparkline(history, options, probs, resolvedIndex = -1) {
-  const W = 260, H = 95, PAD = 5;
+  const W = 260, H = 95, PAD = 12;
   // Card: fixed 0-100% scale so visual position reflects actual probability
   const { n, svg } = buildChart(history, options, W, H, PAD, 2.2, 4, false, 4, true, resolvedIndex);
 
@@ -807,7 +807,7 @@ function renderMarkets() {
 
 // ─── MODAL CHART ─────────────────────────────────────────────
 function renderModalChart(history, options, probs, resolvedIndex = -1) {
-  const W = 500, H = 220, PAD = 8;
+  const W = 500, H = 220, PAD = 18;
   // Modal: fixed 0-100% scale so visual position reflects actual probability
   const { n, svg } = buildChart(history, options, W, H, PAD, 2.5, 6, true, 5, true, resolvedIndex);
 
