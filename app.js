@@ -135,12 +135,13 @@ async function submitNickname() {
   const existing = snap.val() || {};
   const taken = Object.values(existing).some(u => u.name?.toLowerCase() === name.toLowerCase());
 
-  if (taken) {
-    const err = document.getElementById("nickname-error");
-    err.textContent = "That name is taken. Pick another.";
-    err.classList.remove("hidden");
+  const existingEntry = Object.entries(existing).find(([, u]) => u.name?.toLowerCase() === name.toLowerCase());
+
+  if (existingEntry) {
+    const [existingId, existingUser] = existingEntry;
     btn.disabled = false;
     btn.textContent = "Enter Markets";
+    showClaimModal(name, existingId, existingUser);
     return;
   }
 
@@ -150,6 +151,37 @@ async function submitNickname() {
   onUserReady();
   btn.disabled = false;
   btn.textContent = "Enter Markets";
+}
+
+function showClaimModal(name, existingId, existingUser) {
+  document.getElementById("claim-modal-overlay").classList.remove("hidden");
+  const avatarEl = document.getElementById("claim-modal-avatar");
+  if (existingUser.avatar) {
+    avatarEl.style.backgroundImage = `url(${existingUser.avatar})`;
+    avatarEl.classList.add("has-image");
+  } else {
+    avatarEl.style.backgroundImage = "";
+    avatarEl.classList.remove("has-image");
+    avatarEl.textContent = getInitials(name);
+  }
+  document.getElementById("claim-modal-name").textContent = name;
+  document.getElementById("claim-modal-balance").textContent = `$${(existingUser.balance ?? 1000).toLocaleString()} balance`;
+
+  document.getElementById("claim-yes-btn").onclick = () => {
+    // Reclaim: take over existing account on this device
+    user = { id: existingId, name: existingUser.name, balance: existingUser.balance ?? 1000, avatar: existingUser.avatar || null };
+    localStorage.setItem("forecast_user", JSON.stringify(user));
+    document.getElementById("claim-modal-overlay").classList.add("hidden");
+    document.getElementById("nickname-overlay").classList.add("hidden");
+    onUserReady();
+  };
+
+  document.getElementById("claim-no-btn").onclick = () => {
+    document.getElementById("claim-modal-overlay").classList.add("hidden");
+    const err = document.getElementById("nickname-error");
+    err.textContent = "That name is taken. Pick another.";
+    err.classList.remove("hidden");
+  };
 }
 
 function onUserReady() {

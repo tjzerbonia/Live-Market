@@ -1,5 +1,20 @@
 /* === Admin-specific styles === */
 
+.merge-select {
+  background: var(--bg);
+  border: 1px solid var(--border-accent);
+  border-radius: var(--radius-sm);
+  color: var(--text);
+  font-size: 0.82rem;
+  padding: 0.4rem 0.6rem;
+  width: 100%;
+}
+.merge-hint {
+  font-size: 0.72rem;
+  color: var(--text-dim);
+  line-height: 1.4;
+}
+
 .secondary-btn {
   background: none;
   border: 1px solid var(--border-accent);

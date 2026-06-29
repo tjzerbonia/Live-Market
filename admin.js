@@ -574,6 +574,7 @@ function subscribeToPlayers() {
           <div class="player-seen">active ${seen}</div>
           <button class="player-trades-btn" data-uid="${id}">Trades</button>
           <button class="player-adjust-btn" data-uid="${id}">Adjust</button>
+          <button class="player-merge-btn" data-uid="${id}">Merge</button>
           <button class="player-reset-btn" data-uid="${id}">Reset</button>
           <button class="player-delete-btn" data-uid="${id}">Delete</button>
         </div>`;
@@ -586,6 +587,9 @@ function subscribeToPlayers() {
     container.querySelectorAll(".player-adjust-btn").forEach(btn => {
       btn.addEventListener("click", () => showAdjustPicker(btn.dataset.uid));
     });
+    container.querySelectorAll(".player-merge-btn").forEach(btn => {
+      btn.addEventListener("click", () => showMergePicker(btn.dataset.uid));
+    });
     container.querySelectorAll(".player-reset-btn").forEach(btn => {
       btn.addEventListener("click", () => resetUser(btn.dataset.uid));
     });
@@ -596,6 +600,85 @@ function subscribeToPlayers() {
       });
     });
   });
+}
+
+function showMergePicker(keepId) {
+  const existing = document.getElementById(`merge-picker-${keepId}`);
+  if (existing) { existing.remove(); return; }
+
+  const keepPlayer = allPlayers[keepId];
+  const others = Object.entries(allPlayers).filter(([id]) => id !== keepId);
+
+  const picker = document.createElement("div");
+  picker.id = `merge-picker-${keepId}`;
+  picker.className = "balance-adjust-picker";
+  picker.innerHTML = `
+    <span class="adjust-picker-label">Merge another account INTO <strong>${keepPlayer?.name || "this player"}</strong></span>
+    <select class="merge-select">
+      <option value="">— Select account to absorb —</option>
+      ${others.map(([id, p]) => `<option value="${id}">${p.name || "Unknown"} ($${(p.balance ?? 1000).toLocaleString()})</option>`).join("")}
+    </select>
+    <div class="merge-hint">Their balance and bets will move to ${keepPlayer?.name || "this player"}. Their account is then deleted.</div>
+    <div style="display:flex;gap:0.5rem;margin-top:0.25rem">
+      <button class="admin-action-btn resolve merge-confirm-btn" disabled>Merge</button>
+      <button class="admin-action-btn merge-cancel-btn">Cancel</button>
+    </div>`;
+
+  const row = document.querySelector(`.admin-player-row[data-uid="${keepId}"]`);
+  if (row) row.after(picker);
+
+  const select = picker.querySelector(".merge-select");
+  const confirmBtn = picker.querySelector(".merge-confirm-btn");
+  select.addEventListener("change", () => {
+    confirmBtn.disabled = !select.value;
+  });
+  picker.querySelector(".merge-cancel-btn").addEventListener("click", () => picker.remove());
+  confirmBtn.addEventListener("click", () => mergeUsers(keepId, select.value, picker));
+}
+
+async function mergeUsers(keepId, absorbId, picker) {
+  const keepPlayer   = allPlayers[keepId];
+  const absorbPlayer = allPlayers[absorbId];
+  if (!keepPlayer || !absorbPlayer) return;
+  if (!confirm(`Merge "${absorbPlayer.name}" INTO "${keepPlayer.name}"?\n\nThis combines balances, re-attributes all bets, and deletes "${absorbPlayer.name}". Cannot be undone.`)) return;
+
+  const confirmBtn = picker.querySelector(".merge-confirm-btn");
+  confirmBtn.disabled = true;
+  confirmBtn.textContent = "Merging...";
+
+  // 1. Re-attribute all bets from absorbId to keepId
+  const betsSnap = await get(ref(db, "bets"));
+  const allBets  = betsSnap.val() || {};
+  const betUpdates = {};
+  Object.entries(allBets).forEach(([betKey, b]) => {
+    if (b.userId === absorbId) {
+      betUpdates[`bets/${betKey}/userId`]   = keepId;
+      betUpdates[`bets/${betKey}/userName`] = keepPlayer.name;
+    }
+  });
+
+  // 2. Combine balances
+  const newBalance = (keepPlayer.balance ?? 1000) + (absorbPlayer.balance ?? 1000) - 1000;
+  betUpdates[`users/${keepId}/balance`] = newBalance;
+
+  // 3. Re-attribute reactions
+  const reactionsSnap = await get(ref(db, "reactions"));
+  const allReactionsData = reactionsSnap.val() || {};
+  Object.entries(allReactionsData).forEach(([betKey, emojis]) => {
+    Object.entries(emojis).forEach(([emojiKey, users]) => {
+      if (users[absorbId]) {
+        betUpdates[`reactions/${betKey}/${emojiKey}/${keepId}`]   = true;
+        betUpdates[`reactions/${betKey}/${emojiKey}/${absorbId}`] = null;
+      }
+    });
+  });
+
+  await update(ref(db), betUpdates);
+  await remove(ref(db, `users/${absorbId}`));
+  await remove(ref(db, `config/user_resets/${absorbId}`));
+
+  picker.remove();
+  showToast(`Merged "${absorbPlayer.name}" into "${keepPlayer.name}". New balance: $${newBalance.toLocaleString()}.`);
 }
 
 function formatCloseDate(str) {

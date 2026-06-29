@@ -1412,6 +1412,44 @@ main {
 /* === Draft status pill === */
 .market-status-pill.draft { background: rgba(245,158,11,0.12); color: #f59e0b; }
 
+/* === Account Claim Modal === */
+.claim-user-row {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  background: var(--bg);
+  border: 1px solid var(--border-accent);
+  border-radius: var(--radius-sm);
+  padding: 0.75rem 1rem;
+}
+.claim-modal-avatar {
+  width: 48px;
+  height: 48px;
+  flex-shrink: 0;
+}
+.claim-modal-name {
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--text);
+}
+.claim-modal-balance {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  margin-top: 0.15rem;
+}
+.claim-no-btn {
+  background: none;
+  border: 1px solid var(--border-accent);
+  border-radius: var(--radius-sm);
+  color: var(--text-muted);
+  font-size: 0.875rem;
+  padding: 0.65rem;
+  cursor: pointer;
+  transition: all 0.15s;
+  text-align: center;
+}
+.claim-no-btn:hover { color: var(--text); border-color: var(--text-muted); }
+
 /* === Win Modal === */
 .win-modal {
   text-align: center;
