@@ -107,10 +107,17 @@ function buildSbCard(id, m) {
   const disabledAttr = isOpen ? "" : "disabled";
 
   // Determine which side is in the parlay (for visual feedback)
-  const legA = parlayLegs.find(l => l.marketId === id && l.side === "A");
-  const legB = parlayLegs.find(l => l.marketId === id && l.side === "B");
-  const legO = parlayLegs.find(l => l.marketId === id && l.side === "over");
-  const legU = parlayLegs.find(l => l.marketId === id && l.side === "under");
+  const addedLeg  = parlayLegs.find(l => l.marketId === id);
+  const addedSide = addedLeg ? addedLeg.side : null;
+
+  // Helper: parlay button for a given side key + short label
+  function parlayBtn(side, shortLabel) {
+    if (!isOpen) return "";
+    const isAdded  = addedSide === side;
+    const disabled = isAdded || (addedSide && addedSide !== side) ? "disabled" : "";
+    const label    = isAdded ? "Added" : `+ ${shortLabel}`;
+    return `<button class="sb-parlay-btn${isAdded ? " added" : ""}" onclick="addToParlay('${id}','${side}')" ${disabled}>${label}</button>`;
+  }
 
   let sidesHtml = "";
   let parlayBtnHtml = "";
@@ -121,41 +128,47 @@ function buildSbCard(id, m) {
     const underOdds = m.underOdds ?? -110;
 
     sidesHtml = `
-      <button class="sb-side-btn${legO ? " selected" : ""}" onclick="sbOpenBet('${id}','over')" ${disabledAttr}>
+      <button class="sb-side-btn${addedSide === "over" ? " selected" : ""}" onclick="sbOpenBet('${id}','over')" ${disabledAttr}>
         <span class="sb-side-label">Over</span>
         <span class="sb-side-spread">${escHtml(String(line))}</span>
         <span class="sb-side-odds ${oddsClass(overOdds)}">${fmtOdds(overOdds)}</span>
       </button>
-      <button class="sb-side-btn${legU ? " selected" : ""}" onclick="sbOpenBet('${id}','under')" ${disabledAttr}>
+      <button class="sb-side-btn${addedSide === "under" ? " selected" : ""}" onclick="sbOpenBet('${id}','under')" ${disabledAttr}>
         <span class="sb-side-label">Under</span>
         <span class="sb-side-spread">${escHtml(String(line))}</span>
         <span class="sb-side-odds ${oddsClass(underOdds)}">${fmtOdds(underOdds)}</span>
       </button>`;
-    // Parlay adds the over side by default
-    parlayBtnHtml = `<button class="sb-parlay-btn" onclick="addToParlay('${id}','over')" ${disabledAttr || (parlayLegs.find(l => l.marketId === id) ? "disabled" : "")}>
-      ${parlayLegs.find(l => l.marketId === id) ? "Added" : "+ Parlay"}
-    </button>`;
+    parlayBtnHtml = `<div class="sb-parlay-pair">
+      ${parlayBtn("over", "Over")}
+      ${parlayBtn("under", "Under")}
+    </div>`;
   } else {
     // moneyline or spread
-    const sideA = m.sideA || {};
-    const sideB = m.sideB || {};
-    const oddsA = sideA.odds ?? -110;
-    const oddsB = sideB.odds ?? -110;
+    const sideA  = m.sideA || {};
+    const sideB  = m.sideB || {};
+    const oddsA  = sideA.odds ?? -110;
+    const oddsB  = sideB.odds ?? -110;
+    const labelA = sideA.label || "Side A";
+    const labelB = sideB.label || "Side B";
+    // Truncate label for the parlay button so it fits
+    const shortA = labelA.split(" ")[0];
+    const shortB = labelB.split(" ")[0];
 
     sidesHtml = `
-      <button class="sb-side-btn${legA ? " selected" : ""}" onclick="sbOpenBet('${id}','A')" ${disabledAttr}>
-        <span class="sb-side-label">${escHtml(sideA.label || "Side A")}</span>
+      <button class="sb-side-btn${addedSide === "A" ? " selected" : ""}" onclick="sbOpenBet('${id}','A')" ${disabledAttr}>
+        <span class="sb-side-label">${escHtml(labelA)}</span>
         <span class="sb-side-spread">${subtype === "spread" && sideA.spread ? escHtml(String(sideA.spread)) : ""}</span>
         <span class="sb-side-odds ${oddsClass(oddsA)}">${fmtOdds(oddsA)}</span>
       </button>
-      <button class="sb-side-btn${legB ? " selected" : ""}" onclick="sbOpenBet('${id}','B')" ${disabledAttr}>
-        <span class="sb-side-label">${escHtml(sideB.label || "Side B")}</span>
+      <button class="sb-side-btn${addedSide === "B" ? " selected" : ""}" onclick="sbOpenBet('${id}','B')" ${disabledAttr}>
+        <span class="sb-side-label">${escHtml(labelB)}</span>
         <span class="sb-side-spread">${subtype === "spread" && sideB.spread ? escHtml(String(sideB.spread)) : ""}</span>
         <span class="sb-side-odds ${oddsClass(oddsB)}">${fmtOdds(oddsB)}</span>
       </button>`;
-    parlayBtnHtml = `<button class="sb-parlay-btn" onclick="addToParlay('${id}','A')" ${disabledAttr || (parlayLegs.find(l => l.marketId === id) ? "disabled" : "")}>
-      ${parlayLegs.find(l => l.marketId === id) ? "Added" : "+ Parlay"}
-    </button>`;
+    parlayBtnHtml = `<div class="sb-parlay-pair">
+      ${parlayBtn("A", shortA)}
+      ${parlayBtn("B", shortB)}
+    </div>`;
   }
 
   return `

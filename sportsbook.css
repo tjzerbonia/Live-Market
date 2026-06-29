@@ -155,6 +155,11 @@
   color: var(--text-dim);
 }
 
+.sb-parlay-pair {
+  display: flex;
+  gap: 0.35rem;
+}
+
 .sb-parlay-btn {
   font-size: 0.72rem;
   font-weight: 700;
@@ -167,7 +172,11 @@
   transition: opacity 0.15s;
   white-space: nowrap;
 }
-.sb-parlay-btn:hover { opacity: 0.8; }
+.sb-parlay-btn:hover:not(:disabled) { opacity: 0.8; }
+.sb-parlay-btn.added {
+  color: var(--yes);
+  background: var(--yes-dim);
+}
 .sb-parlay-btn:disabled {
   opacity: 0.35;
   cursor: not-allowed;
