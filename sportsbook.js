@@ -347,11 +347,6 @@ window.openParlayForMarket = function(marketId) {
 
   pendingParlayMarketId = marketId;
 
-  const slip = document.getElementById("parlay-slip");
-  if (slip) {
-    slip.classList.add("visible");
-    slip.classList.remove("collapsed");
-  }
   renderParlaySlip();
   renderSbMarkets();
 };
@@ -433,13 +428,22 @@ function renderParlaySlip() {
 
   const count      = parlayLegs.length;
   const hasPending = !!pendingParlayMarketId;
-  document.getElementById("parlay-count").textContent = count;
+
+  // Update tab label — show a hint when a side selection is waiting
+  const countEl = document.getElementById("parlay-count");
+  if (countEl) countEl.textContent = count;
+  const hintEl = document.getElementById("parlay-tab-hint");
+  if (hintEl) hintEl.textContent = hasPending ? " · Tap to pick side" : "";
 
   if (count === 0 && !hasPending) {
     slip.classList.remove("visible");
     return;
   }
   slip.classList.add("visible");
+  // Only auto-expand when legs exist — pending state keeps slip collapsed
+  if (count > 0 && slip.classList.contains("collapsed")) {
+    // leave collapsed; user opens manually
+  }
 
   // Side picker for pending market
   let pendingHtml = "";
@@ -611,7 +615,7 @@ function injectParlaySlip() {
   slip.className = "parlay-slip collapsed";
   slip.innerHTML = `
     <div class="parlay-slip-tab" onclick="toggleParlaySlip()">
-      <span>Parlay (<span id="parlay-count">0</span>)</span>
+      <span>Parlay (<span id="parlay-count">0</span>)<span id="parlay-tab-hint" class="parlay-tab-hint"></span></span>
       <span class="parlay-slip-odds" id="parlay-slip-odds-display"></span>
     </div>
     <div class="parlay-slip-body">
