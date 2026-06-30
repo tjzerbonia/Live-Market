@@ -70,7 +70,7 @@ window.setSbFilter = function(filter) {
 
 window.setSbCategoryFilter = function(cat) {
   sbCategoryFilter = cat;
-  renderSbMarkets();
+  window.renderSbMarkets();
 };
 
 // ─── RENDER MARKETS ───────────────────────────────────────────
