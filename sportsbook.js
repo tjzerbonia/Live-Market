@@ -70,9 +70,6 @@ window.setSbFilter = function(filter) {
 
 window.setSbCategoryFilter = function(cat) {
   sbCategoryFilter = cat;
-  document.querySelectorAll("[data-sbcat]").forEach(btn => {
-    btn.classList.toggle("active", btn.dataset.sbcat === cat);
-  });
   renderSbMarkets();
 };
 
@@ -95,8 +92,8 @@ window.renderSbMarkets = function() {
     const cats = [...new Set(entries.map(([, m]) => m.category || "General"))].sort();
     if (cats.length >= 2) {
       catRow.style.display = "";
-      catRow.innerHTML = [`<button class="category-filter-btn${sbCategoryFilter === "all" ? " active" : ""}" data-sbcat="all" onclick="setSbCategoryFilter('all')">All</button>`,
-        ...cats.map(c => `<button class="category-filter-btn${sbCategoryFilter === c ? " active" : ""}" data-sbcat="${escHtml(c)}" onclick="setSbCategoryFilter('${escHtml(c)}')">${escHtml(c)}</button>`)
+      catRow.innerHTML = [`<button class="market-filter-btn category-filter-btn${sbCategoryFilter === "all" ? " active" : ""}" data-sbcat="all" onclick="setSbCategoryFilter('all')">All</button>`,
+        ...cats.map(c => `<button class="market-filter-btn category-filter-btn${sbCategoryFilter === c ? " active" : ""}" data-sbcat="${escHtml(c)}" onclick="setSbCategoryFilter('${escHtml(c).replace(/'/g, "\\'")}'">${escHtml(c)}</button>`)
       ].join("");
     } else {
       catRow.style.display = "none";
