@@ -328,10 +328,23 @@ sportsbook,NFL,Bears vs Packers Total Points,total,,,,,,,<span class="csv-odds-p
   <!-- ─── DOWNLOAD TEMPLATE ────────────────────────────────── -->
   <div class="guide-section">
     <h2>Download a template</h2>
-    <p>Click below to download a pre-formatted CSV with one example of each type.</p>
-    <div class="download-row">
-      <button class="download-btn" onclick="downloadTemplate()">Download CSV Template</button>
-      <a href="admin.html" class="download-btn secondary">Back to Admin</a>
+    <p>Download the template that matches what you want to upload. Each file has the correct column headers and example rows ready to edit. You can upload them separately or copy the rows into one file — the importer handles both types automatically.</p>
+
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;margin:1rem 0">
+      <div class="odds-card">
+        <div style="font-size:0.7rem;font-weight:700;text-transform:uppercase;letter-spacing:0.05em;color:var(--accent);margin-bottom:0.4rem">Prediction Markets</div>
+        <p style="margin-bottom:0.85rem">Questions with options and probabilities. YES/NO, multi-choice, etc.</p>
+        <button class="download-btn" style="width:100%" onclick="downloadPMTemplate()">Download Prediction Template</button>
+      </div>
+      <div class="odds-card">
+        <div style="font-size:0.7rem;font-weight:700;text-transform:uppercase;letter-spacing:0.05em;color:var(--accent);margin-bottom:0.4rem">Book Bets (Sportsbook)</div>
+        <p style="margin-bottom:0.85rem">Moneyline, spread, and over/under bets with American odds.</p>
+        <button class="download-btn" style="width:100%" onclick="downloadSBTemplate()">Download Sportsbook Template</button>
+      </div>
+    </div>
+
+    <div class="download-row" style="margin-top:0.5rem">
+      <a href="admin.html" class="download-btn secondary">← Back to Admin</a>
     </div>
   </div>
 
@@ -340,21 +353,41 @@ sportsbook,NFL,Bears vs Packers Total Points,total,,,,,,,<span class="csv-odds-p
     const savedTheme = localStorage.getItem("forecast_theme");
     if (savedTheme) document.documentElement.setAttribute("data-theme", savedTheme);
 
-    function downloadTemplate() {
-      const csv = [
+    function downloadPMTemplate() {
+      const rows = [
+        // Header
         "Title,Category,Close Date (YYYY-MM-DD),Close Time (HH:MM),Option 1,Prob 1 (%),Option 2,Prob 2 (%),Option 3,Prob 3 (%),Option 4,Prob 4 (%),Option 5,Prob 5 (%)",
+        // YES/NO example
         "Will the Bears make the playoffs?,NFL,2026-01-10,12:00,YES,40,NO,60,,,,,,",
+        // Multi-choice example
         "Who wins the race?,BIX 7,2026-07-25,08:00,Nick,25,TJ,25,Jake,25,Sam,25,,",
-        "sportsbook,NFL,Bears vs Packers,moneyline,Bears,,-150,Packers,,+120,,,",
-        "sportsbook,NFL,Bears vs Packers,spread,Bears,-3.5,-110,Packers,+3.5,-110,,,",
-        "sportsbook,NFL,Bears vs Packers Total Points,total,,,,,,,47.5,-110,-110",
-      ].join("\n");
+        // 3-option example
+        "Which team finishes first?,NBA,2026-06-01,18:00,Celtics,45,Lakers,30,Warriors,25,,,"
+      ];
+      triggerDownload(rows.join("\n"), "prediction-market-template.csv");
+    }
 
+    function downloadSBTemplate() {
+      const rows = [
+        // Header — matches exactly what the importer expects for sportsbook rows
+        "type,Category,Title,Subtype,SideA,SideA_Spread,SideA_Odds,SideB,SideB_Spread,SideB_Odds,Line,OverOdds,UnderOdds",
+        // Moneyline: spread columns blank, no Line/Over/Under
+        "sportsbook,NFL,Bears vs Packers,moneyline,Bears,,-150,Packers,,+120,,,",
+        // Spread: both sides -110, spread values opposite signs
+        "sportsbook,NFL,Bears vs Packers,spread,Bears,-3.5,-110,Packers,+3.5,-110,,,",
+        // Total: SideA/B and their columns blank, fill Line/OverOdds/UnderOdds
+        "sportsbook,NFL,Bears vs Packers Total Points,total,,,,,,,47.5,-110,-110"
+      ];
+      triggerDownload(rows.join("\n"), "sportsbook-template.csv");
+    }
+
+    function triggerDownload(csv, filename) {
       const blob = new Blob([csv], { type: "text/csv" });
       const a = document.createElement("a");
       a.href = URL.createObjectURL(blob);
-      a.download = "market-template.csv";
+      a.download = filename;
       a.click();
+      URL.revokeObjectURL(a.href);
     }
   </script>
 </body>
