@@ -16,6 +16,7 @@ const db = getDatabase(getApp());
 let allSbMarkets = {};
 let parlayLegs   = [];   // [{ marketId, marketTitle, subtype, side, sideLabel, odds }] — side may be null until picked
 let sbFilter     = "open"; // "open" | "closed" | "all"
+let sbCategoryFilter = "all";
 
 // ─── ODDS HELPERS ─────────────────────────────────────────────
 function americanToDecimal(odds) {
@@ -63,6 +64,15 @@ window.setSbFilter = function(filter) {
   document.querySelectorAll("[data-sbfilter]").forEach(btn => {
     btn.classList.toggle("active", btn.dataset.sbfilter === filter);
   });
+  sbCategoryFilter = "all";
+  renderSbMarkets();
+};
+
+window.setSbCategoryFilter = function(cat) {
+  sbCategoryFilter = cat;
+  document.querySelectorAll("[data-sbcat]").forEach(btn => {
+    btn.classList.toggle("active", btn.dataset.sbcat === cat);
+  });
   renderSbMarkets();
 };
 
@@ -79,12 +89,33 @@ window.renderSbMarkets = function() {
     entries = entries.filter(([, m]) => m.status === "closed");
   }
 
-  // Open first, then by createdAt desc
+  // Build category filter buttons
+  const catRow = document.getElementById("sb-category-filter-row");
+  if (catRow) {
+    const cats = [...new Set(entries.map(([, m]) => m.category || "General"))].sort();
+    if (cats.length >= 2) {
+      catRow.style.display = "";
+      catRow.innerHTML = [`<button class="category-filter-btn${sbCategoryFilter === "all" ? " active" : ""}" data-sbcat="all" onclick="setSbCategoryFilter('all')">All</button>`,
+        ...cats.map(c => `<button class="category-filter-btn${sbCategoryFilter === c ? " active" : ""}" data-sbcat="${escHtml(c)}" onclick="setSbCategoryFilter('${escHtml(c)}')">${escHtml(c)}</button>`)
+      ].join("");
+    } else {
+      catRow.style.display = "none";
+      sbCategoryFilter = "all";
+    }
+  }
+
+  if (sbCategoryFilter !== "all") {
+    entries = entries.filter(([, m]) => (m.category || "General") === sbCategoryFilter);
+  }
+
+  // Open first, then by order, then by createdAt desc
   entries.sort((a, b) => {
     const statusOrder = { open: 0, closed: 1 };
     const sd = (statusOrder[a[1].status] ?? 1) - (statusOrder[b[1].status] ?? 1);
     if (sd !== 0) return sd;
-    return (b[1].createdAt || 0) - (a[1].createdAt || 0);
+    const ao = a[1].order != null ? a[1].order : -(a[1].createdAt || 0);
+    const bo = b[1].order != null ? b[1].order : -(b[1].createdAt || 0);
+    return ao - bo;
   });
 
   if (entries.length === 0) {
