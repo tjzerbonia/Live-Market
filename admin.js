@@ -1169,10 +1169,10 @@ window.saveSbMarket = async function() {
   };
 
   if (subtype === "total") {
-    const line      = parseFloat(document.getElementById("sb-line").value);
+    const line      = document.getElementById("sb-line").value.trim();
     const overOdds  = parseInt(document.getElementById("sb-over-odds").value);
     const underOdds = parseInt(document.getElementById("sb-under-odds").value);
-    if (isNaN(line) || isNaN(overOdds) || isNaN(underOdds)) {
+    if (!line || isNaN(overOdds) || isNaN(underOdds)) {
       alert("Please fill in the total line, over odds, and under odds."); return;
     }
     data.line = line; data.overOdds = overOdds; data.underOdds = underOdds;

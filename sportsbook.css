@@ -290,6 +290,29 @@
   line-height: 1.35;
 }
 
+.sb-modal-total-line {
+  text-align: center;
+  padding: 0.5rem 0 0.25rem;
+}
+.sb-modal-total-line.hidden { display: none; }
+
+.sb-modal-line-label {
+  font-size: 0.65rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--text-dim);
+  margin-bottom: 0.2rem;
+}
+
+.sb-modal-line-value {
+  font-size: 2.25rem;
+  font-weight: 800;
+  color: var(--text);
+  letter-spacing: -0.02em;
+  line-height: 1;
+}
+
 .sb-modal-side-row {
   display: flex;
   align-items: center;
