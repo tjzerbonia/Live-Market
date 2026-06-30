@@ -204,12 +204,31 @@ function buildSbCard(id, m) {
 // ─── SINGLE BET MODAL ─────────────────────────────────────────
 let activeSbBet = { marketId: null, side: null, odds: 0 };
 
+function isSbInsiderBlocked(m, userName) {
+  if (!userName) return false;
+  const nameTokens = userName.toLowerCase().replace(/[^a-z0-9\s]/g, " ").split(/\s+/).filter(t => t.length >= 2);
+  if (!nameTokens.length) return false;
+  const titleTokens = new Set(
+    (m.title || "").toLowerCase().replace(/[^a-z0-9\s]/g, " ").split(/\s+/).filter(Boolean)
+  );
+  const sideTokens = [m.sideA?.label, m.sideB?.label].filter(Boolean)
+    .join(" ").toLowerCase().replace(/[^a-z0-9\s]/g, " ").split(/\s+/).filter(t => t.length >= 2);
+  return nameTokens.some(nt =>
+    titleTokens.has(nt) || sideTokens.some(st => st === nt || (st.length >= 3 && nt.startsWith(st)))
+  );
+}
+
 window.sbOpenBet = function(marketId, side) {
   const user = getCurrentUser();
   if (!user || !user.id) { showSbToast("Please set your name first."); return; }
 
   const m = allSbMarkets[marketId];
   if (!m || m.status !== "open") return;
+
+  if (isSbInsiderBlocked(m, user.name)) {
+    showSbToast("You're named in this market — trading restricted.");
+    return;
+  }
 
   activeSbBet.marketId = marketId;
   activeSbBet.side = side;
@@ -218,13 +237,14 @@ window.sbOpenBet = function(marketId, side) {
   let odds = -110;
   const subtype = m.subtype || "moneyline";
 
+  const totalLineWrap = document.getElementById("sb-bet-total-line-wrap");
+
   if (subtype === "total") {
-    if (side === "over") {
-      sideLabel = `Over ${m.line ?? ""}`;
-      odds = m.overOdds ?? -110;
-    } else {
-      sideLabel = `Under ${m.line ?? ""}`;
-      odds = m.underOdds ?? -110;
+    sideLabel = side === "over" ? "Over" : "Under";
+    odds = side === "over" ? (m.overOdds ?? -110) : (m.underOdds ?? -110);
+    if (totalLineWrap) {
+      totalLineWrap.classList.remove("hidden");
+      document.getElementById("sb-bet-line-value").textContent = m.line ?? "";
     }
   } else {
     if (side === "A") {
@@ -234,7 +254,10 @@ window.sbOpenBet = function(marketId, side) {
       sideLabel = m.sideB?.label || "Side B";
       odds = m.sideB?.odds ?? -110;
     }
+    if (totalLineWrap) totalLineWrap.classList.add("hidden");
   }
+  // Keep full label for bet records / parlay slip
+  activeSbBet.sideLabel = subtype === "total" ? `${sideLabel} ${m.line ?? ""}`.trim() : sideLabel;
   activeSbBet.odds = odds;
 
   // Populate modal
@@ -287,7 +310,7 @@ window.placeSbBet = async function() {
   btn.textContent = "Placing...";
 
   const payout = Math.round(amount * americanToDecimal(activeSbBet.odds));
-  const sideLabel = document.getElementById("sb-bet-side-label").textContent;
+  const sideLabel = activeSbBet.sideLabel || document.getElementById("sb-bet-side-label").textContent;
   const subtype   = m.subtype || "moneyline";
 
   const newBalance = currentBalance - amount;
@@ -362,6 +385,11 @@ window.addToParlay = function(marketId) {
 
   const m = allSbMarkets[marketId];
   if (!m || m.status !== "open") return;
+
+  if (isSbInsiderBlocked(m, user.name)) {
+    showSbToast("You're named in this market — trading restricted.");
+    return;
+  }
 
   if (parlayLegs.find(l => l.marketId === marketId)) {
     showSbToast("Already in your parlay.");
@@ -646,6 +674,10 @@ function injectSbBetModal() {
       <button class="modal-close" onclick="closeSbBetModal()">&#x2715;</button>
       <div class="sb-modal-category" id="sb-bet-category"></div>
       <div class="sb-modal-title" id="sb-bet-title"></div>
+      <div class="sb-modal-total-line hidden" id="sb-bet-total-line-wrap">
+        <div class="sb-modal-line-label">Total</div>
+        <div class="sb-modal-line-value" id="sb-bet-line-value"></div>
+      </div>
       <div class="sb-modal-side-row">
         <span class="sb-modal-side-label" id="sb-bet-side-label"></span>
         <span class="sb-modal-odds" id="sb-bet-odds-display"></span>

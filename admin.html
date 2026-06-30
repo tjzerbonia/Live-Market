@@ -134,7 +134,7 @@
 
         <!-- Sportsbook Create Form -->
         <div class="admin-form-section" style="margin-bottom:1.5rem;position:static;">
-          <h3 style="font-size:0.875rem;font-weight:600;color:var(--text);margin-bottom:0.5rem;">New Sportsbook Market</h3>
+          <h3 id="sb-form-heading" style="font-size:0.875rem;font-weight:600;color:var(--text);margin-bottom:0.5rem;">New Sportsbook Market</h3>
 
           <div class="form-row">
             <div class="form-group">
@@ -208,6 +208,7 @@
 
           <div class="form-actions" style="margin-top:0.5rem">
             <button id="sb-save-btn" onclick="saveSbMarket()">Create Sportsbook Market</button>
+            <button id="sb-cancel-edit-btn" class="secondary hidden" onclick="cancelSbEdit()">Cancel</button>
           </div>
         </div>
 

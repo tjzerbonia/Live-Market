@@ -1156,6 +1156,66 @@ document.addEventListener("DOMContentLoaded", () => {
 });
 
 // ─── SAVE SPORTSBOOK MARKET ───────────────────────────────────
+let editingSbId = null;
+
+function resetSbForm() {
+  editingSbId = null;
+  document.getElementById("sb-title").value = "";
+  document.getElementById("sb-category").value = "";
+  document.getElementById("sb-sideA-label").value = "";
+  document.getElementById("sb-sideA-spread").value = "";
+  document.getElementById("sb-sideA-odds").value = "";
+  document.getElementById("sb-sideB-label").value = "";
+  document.getElementById("sb-sideB-spread").value = "";
+  document.getElementById("sb-sideB-odds").value = "";
+  document.getElementById("sb-line").value = "";
+  document.getElementById("sb-over-odds").value = "";
+  document.getElementById("sb-under-odds").value = "";
+  const btn = document.getElementById("sb-save-btn");
+  btn.textContent = "Create Sportsbook Market";
+  const cancelBtn = document.getElementById("sb-cancel-edit-btn");
+  if (cancelBtn) cancelBtn.classList.add("hidden");
+  const heading = document.getElementById("sb-form-heading");
+  if (heading) heading.textContent = "New Sportsbook Market";
+}
+
+window.startSbEdit = function(id) {
+  const m = allSbMarkets[id];
+  if (!m) return;
+  editingSbId = id;
+
+  document.getElementById("sb-subtype").value = m.subtype || "moneyline";
+  onSbSubtypeChange();
+  document.getElementById("sb-title").value = m.title || "";
+  document.getElementById("sb-category").value = m.category || "";
+
+  if (m.subtype === "total") {
+    document.getElementById("sb-line").value = m.line ?? "";
+    document.getElementById("sb-over-odds").value = m.overOdds ?? "";
+    document.getElementById("sb-under-odds").value = m.underOdds ?? "";
+  } else {
+    document.getElementById("sb-sideA-label").value = m.sideA?.label || "";
+    document.getElementById("sb-sideA-odds").value  = m.sideA?.odds ?? "";
+    document.getElementById("sb-sideB-label").value = m.sideB?.label || "";
+    document.getElementById("sb-sideB-odds").value  = m.sideB?.odds ?? "";
+    if (m.subtype === "spread") {
+      document.getElementById("sb-sideA-spread").value = m.sideA?.spread || "";
+      document.getElementById("sb-sideB-spread").value = m.sideB?.spread || "";
+    }
+  }
+
+  const btn = document.getElementById("sb-save-btn");
+  btn.textContent = "Save Changes";
+  const cancelBtn = document.getElementById("sb-cancel-edit-btn");
+  if (cancelBtn) cancelBtn.classList.remove("hidden");
+  const heading = document.getElementById("sb-form-heading");
+  if (heading) heading.textContent = "Edit Sportsbook Market";
+
+  document.getElementById("sb-title").scrollIntoView({ behavior: "smooth", block: "center" });
+};
+
+window.cancelSbEdit = function() { resetSbForm(); };
+
 window.saveSbMarket = async function() {
   const subtype  = document.getElementById("sb-subtype").value;
   const category = (document.getElementById("sb-category").value || "General").trim();
@@ -1163,10 +1223,7 @@ window.saveSbMarket = async function() {
 
   if (!title) { alert("Title is required."); return; }
 
-  const data = {
-    title, category, subtype,
-    status: "open", volume: 0, createdAt: Date.now(),
-  };
+  const data = { title, category, subtype };
 
   if (subtype === "total") {
     const line      = document.getElementById("sb-line").value.trim();
@@ -1195,23 +1252,22 @@ window.saveSbMarket = async function() {
   const btn = document.getElementById("sb-save-btn");
   btn.disabled = true; btn.textContent = "Saving...";
 
-  await push(ref(db, "sb_markets"), data);
+  if (editingSbId) {
+    const existing = allSbMarkets[editingSbId] || {};
+    await update(ref(db, `sb_markets/${editingSbId}`), {
+      ...data,
+      status: existing.status || "open",
+      volume: existing.volume || 0,
+      createdAt: existing.createdAt || Date.now(),
+    });
+    showToast("Sportsbook market updated.");
+  } else {
+    await push(ref(db, "sb_markets"), { ...data, status: "open", volume: 0, createdAt: Date.now() });
+    showToast("Sportsbook market created.");
+  }
 
-  // Reset form
-  document.getElementById("sb-title").value = "";
-  document.getElementById("sb-category").value = "";
-  document.getElementById("sb-sideA-label").value = "";
-  document.getElementById("sb-sideA-spread").value = "";
-  document.getElementById("sb-sideA-odds").value = "";
-  document.getElementById("sb-sideB-label").value = "";
-  document.getElementById("sb-sideB-spread").value = "";
-  document.getElementById("sb-sideB-odds").value = "";
-  document.getElementById("sb-line").value = "";
-  document.getElementById("sb-over-odds").value = "";
-  document.getElementById("sb-under-odds").value = "";
-
-  btn.disabled = false; btn.textContent = "Create Sportsbook Market";
-  showToast("Sportsbook market created.");
+  btn.disabled = false;
+  resetSbForm();
 };
 
 // ─── FILTER ───────────────────────────────────────────────────
@@ -1276,7 +1332,8 @@ function renderSbMarketList() {
           ${isResolved
             ? ""
             : isOpen
-              ? `<button class="admin-action-btn close-market" onclick="setSbMarketStatus('${id}','closed')">Close</button>
+              ? `<button class="admin-action-btn edit" onclick="startSbEdit('${id}')">Edit</button>
+                 <button class="admin-action-btn close-market" onclick="setSbMarketStatus('${id}','closed')">Close</button>
                  <button class="admin-action-btn resolve" onclick="showSbResolveOptions('${id}')">Resolve</button>`
               : `<button class="admin-action-btn reopen" onclick="setSbMarketStatus('${id}','open')">Reopen</button>
                  <button class="admin-action-btn resolve" onclick="showSbResolveOptions('${id}')">Resolve</button>`
