@@ -1233,7 +1233,11 @@ function renderSbMarketList() {
   if (sbAdminFilter === "open")   entries = entries.filter(([, m]) => m.status === "open");
   if (sbAdminFilter === "closed") entries = entries.filter(([, m]) => m.status === "closed" || m.status === "resolved");
 
-  entries.sort((a, b) => (b[1].createdAt || 0) - (a[1].createdAt || 0));
+  entries.sort((a, b) => {
+    const ao = a[1].order != null ? a[1].order : (a[1].createdAt ?? 0);
+    const bo = b[1].order != null ? b[1].order : (b[1].createdAt ?? 0);
+    return ao - bo;
+  });
 
   if (entries.length === 0) {
     container.innerHTML = `<div class="list-empty">No ${sbAdminFilter} sportsbook markets.</div>`;
@@ -1256,7 +1260,8 @@ function renderSbMarketList() {
     }
 
     return `
-      <div class="admin-market-row${isOpen ? "" : " closed"}" data-sb-id="${id}">
+      <div class="admin-market-row${isOpen ? " draggable-row" : " closed"}" data-id="${id}" ${isOpen ? 'draggable="true"' : ""}>
+        ${isOpen ? `<div class="drag-handle" title="Drag to reorder">⠿</div>` : ""}
         <div>
           <div class="admin-market-meta">
             <span class="admin-market-category">${m.category || "General"}</span>
@@ -1280,6 +1285,49 @@ function renderSbMarketList() {
         </div>
       </div>`;
   }).join("");
+
+  initSbDragSort(container);
+}
+
+function initSbDragSort(container) {
+  let dragId = null;
+
+  container.querySelectorAll(".draggable-row").forEach(row => {
+    row.addEventListener("dragstart", (e) => {
+      dragId = row.dataset.id;
+      row.classList.add("drag-ghost");
+      e.dataTransfer.effectAllowed = "move";
+    });
+    row.addEventListener("dragend", () => {
+      row.classList.remove("drag-ghost");
+      container.querySelectorAll(".drag-over").forEach(el => el.classList.remove("drag-over"));
+    });
+    row.addEventListener("dragover", (e) => {
+      e.preventDefault();
+      if (row.dataset.id === dragId) return;
+      container.querySelectorAll(".drag-over").forEach(el => el.classList.remove("drag-over"));
+      row.classList.add("drag-over");
+    });
+    row.addEventListener("drop", async (e) => {
+      e.preventDefault();
+      const targetId = row.dataset.id;
+      if (!dragId || dragId === targetId) return;
+      row.classList.remove("drag-over");
+
+      const openRows = [...container.querySelectorAll(".draggable-row")];
+      const ids = openRows.map(r => r.dataset.id);
+      const fromIdx = ids.indexOf(dragId);
+      const toIdx   = ids.indexOf(targetId);
+      if (fromIdx === -1 || toIdx === -1) return;
+
+      ids.splice(fromIdx, 1);
+      ids.splice(toIdx, 0, dragId);
+
+      const updates = {};
+      ids.forEach((id, i) => { updates[`sb_markets/${id}/order`] = i * 10; });
+      await update(ref(db), updates);
+    });
+  });
 }
 
 // ─── STATUS / DELETE ──────────────────────────────────────────
@@ -1324,7 +1372,7 @@ window.showSbResolveOptions = function(id) {
     btns[i].addEventListener("click", () => resolveSbMarket(id, s.key, s.label));
   });
 
-  const row = document.querySelector(`.admin-market-row[data-sb-id="${id}"]`);
+  const row = document.querySelector(`#admin-sb-market-list .admin-market-row[data-id="${id}"]`);
   if (row) row.after(picker);
 };
 
