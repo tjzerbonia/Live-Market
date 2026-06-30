@@ -68,10 +68,6 @@ window.setSbFilter = function(filter) {
   renderSbMarkets();
 };
 
-window.setSbCategoryFilter = function(cat) {
-  sbCategoryFilter = cat;
-  window.renderSbMarkets();
-};
 
 // ─── RENDER MARKETS ───────────────────────────────────────────
 window.renderSbMarkets = function() {
@@ -92,9 +88,15 @@ window.renderSbMarkets = function() {
     const cats = [...new Set(entries.map(([, m]) => m.category || "General"))].sort();
     if (cats.length >= 2) {
       catRow.style.display = "";
-      catRow.innerHTML = [`<button class="market-filter-btn category-filter-btn${sbCategoryFilter === "all" ? " active" : ""}" data-sbcat="all" onclick="setSbCategoryFilter('all')">All</button>`,
-        ...cats.map(c => `<button class="market-filter-btn category-filter-btn${sbCategoryFilter === c ? " active" : ""}" data-sbcat="${escHtml(c)}" onclick="setSbCategoryFilter('${escHtml(c).replace(/'/g, "\\'")}'">${escHtml(c)}</button>`)
+      catRow.innerHTML = [`<button class="market-filter-btn category-filter-btn${sbCategoryFilter === "all" ? " active" : ""}" data-sbcat="all">All</button>`,
+        ...cats.map(c => `<button class="market-filter-btn category-filter-btn${sbCategoryFilter === c ? " active" : ""}" data-sbcat="${escHtml(c)}">${escHtml(c)}</button>`)
       ].join("");
+      catRow.querySelectorAll("[data-sbcat]").forEach(btn => {
+        btn.addEventListener("click", () => {
+          sbCategoryFilter = btn.dataset.sbcat;
+          window.renderSbMarkets();
+        });
+      });
     } else {
       catRow.style.display = "none";
       sbCategoryFilter = "all";
