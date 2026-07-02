@@ -163,6 +163,7 @@ function subscribeToMarkets() {
 
 // ─── CSV IMPORT ───────────────────────────────────────────────
 // NOTE: CSV format: Title, Category, Close Date (YYYY-MM-DD), Close Time (HH:MM),
+//       Publish Date (YYYY-MM-DD), Publish Time (HH:MM),
 //       Option 1, Prob 1 (%), Option 2, Prob 2 (%), ..., Option 5, Prob 5 (%)
 
 function parseCSVRow(row) {
@@ -186,19 +187,22 @@ function parseCSVMarkets(text) {
     const title = (cols[0] || "").replace(/^"|"$/g, "").trim();
     if (!title) return;
     const category = (cols[1] || "General").replace(/^"|"$/g, "").trim();
-    const dateVal  = (cols[2] || "").replace(/^"|"$/g, "").trim();
-    const timeVal  = (cols[3] || "00:00").replace(/^"|"$/g, "").trim();
-    const closeDate = dateVal ? `${dateVal}T${timeVal || "00:00"}` : null;
+    const dateVal    = (cols[2] || "").replace(/^"|"$/g, "").trim();
+    const timeVal    = (cols[3] || "00:00").replace(/^"|"$/g, "").trim();
+    const closeDate  = dateVal ? `${dateVal}T${timeVal || "00:00"}` : null;
+    const pubDateVal = (cols[4] || "").replace(/^"|"$/g, "").trim();
+    const pubTimeVal = (cols[5] || "00:00").replace(/^"|"$/g, "").trim();
+    const publishAt  = pubDateVal ? new Date(`${pubDateVal}T${pubTimeVal || "00:00"}`).getTime() : null;
     const options = [], baseProbs = [];
     for (let oi = 0; oi < 5; oi++) {
-      const name = (cols[4 + oi * 2] || "").replace(/^"|"$/g, "").trim();
-      const prob = parseFloat((cols[5 + oi * 2] || "").replace(/^"|"$/g, "")) || 0;
+      const name = (cols[6 + oi * 2] || "").replace(/^"|"$/g, "").trim();
+      const prob = parseFloat((cols[7 + oi * 2] || "").replace(/^"|"$/g, "")) || 0;
       if (name && prob > 0) { options.push(name); baseProbs.push(prob); }
     }
     if (options.length < 2) { skipped.push({ title, reason: "fewer than 2 options" }); return; }
     const sum = baseProbs.reduce((s, p) => s + p, 0);
     if (Math.abs(sum - 100) > 5) { skipped.push({ title, reason: `probs sum to ${Math.round(sum)}%` }); return; }
-    parsed.push({ title, category, options, baseProbs, closeDate });
+    parsed.push({ title, category, options, baseProbs, closeDate, publishAt });
   });
   return { parsed, skipped };
 }
@@ -328,7 +332,9 @@ function showCSVPreview(parsed, skipped, sbParsed = [], sbSkipped = []) {
     btn.textContent = "Importing...";
 
     const pmImports = parsed.map(m => push(ref(db, "markets"), {
-      ...m, status: "open", volume: 0, createdAt: Date.now(),
+      ...m,
+      status: (m.publishAt && m.publishAt > Date.now()) ? "draft" : "open",
+      volume: 0, createdAt: Date.now(),
     }));
     const sbImports = sbParsed.map(m => push(ref(db, "sb_markets"), {
       ...m, status: "open", volume: 0, createdAt: Date.now(),

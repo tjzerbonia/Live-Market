@@ -282,27 +282,30 @@ sportsbook,NFL,Bears vs Packers Total Points,total,,,,,,,<span class="csv-odds-p
       <tbody>
         <tr><td class="col-num">A (1)</td><td>Title</td><td class="col-example">Will the Bears make the playoffs?</td><td></td></tr>
         <tr><td class="col-num">B (2)</td><td>Category</td><td class="col-example">NFL</td><td></td></tr>
-        <tr><td class="col-num">C (3)</td><td>Close Date</td><td class="col-example">2026-01-10</td><td>YYYY-MM-DD format</td></tr>
-        <tr><td class="col-num">D (4)</td><td>Close Time</td><td class="col-example">12:00</td><td>HH:MM, 24-hour</td></tr>
-        <tr><td class="col-num">E (5)</td><td>Option 1 Name</td><td class="col-example">YES</td><td></td></tr>
-        <tr><td class="col-num">F (6)</td><td>Option 1 Probability</td><td class="col-example">40</td><td>Must add up to 100 across all options</td></tr>
-        <tr><td class="col-num">G–N (7–14)</td><td>Options 2–5 (Name + Prob)</td><td class="col-example">NO, 60</td><td>Add pairs for each additional option</td></tr>
+        <tr><td class="col-num">C (3)</td><td>Close Date</td><td class="col-example">2026-01-10</td><td>YYYY-MM-DD format. Optional.</td></tr>
+        <tr><td class="col-num">D (4)</td><td>Close Time</td><td class="col-example">12:00</td><td>HH:MM, 24-hour. Optional.</td></tr>
+        <tr><td class="col-num">E (5)</td><td>Publish Date <span class="tag optional">optional</span></td><td class="col-example">2026-07-20</td><td>Go-live date. Leave blank to publish immediately.</td></tr>
+        <tr><td class="col-num">F (6)</td><td>Publish Time <span class="tag optional">optional</span></td><td class="col-example">09:00</td><td>HH:MM, 24-hour. Used with Publish Date.</td></tr>
+        <tr><td class="col-num">G (7)</td><td>Option 1 Name</td><td class="col-example">YES</td><td></td></tr>
+        <tr><td class="col-num">H (8)</td><td>Option 1 Probability</td><td class="col-example">40</td><td>Must add up to 100 across all options</td></tr>
+        <tr><td class="col-num">I–P (9–16)</td><td>Options 2–5 (Name + Prob)</td><td class="col-example">NO, 60</td><td>Add pairs for each additional option</td></tr>
       </tbody>
     </table>
 
-    <h3>Example CSV rows (binary + multi-option)</h3>
-    <div class="csv-block">Title,Category,Close Date (YYYY-MM-DD),Close Time (HH:MM),Option 1,Prob 1 (%),Option 2,Prob 2 (%),Option 3,Prob 3 (%),Option 4,Prob 4 (%),Option 5,Prob 5 (%)
+    <h3>Example CSV rows (binary + multi-option with go-live date)</h3>
+    <div class="csv-block">Title,Category,Close Date (YYYY-MM-DD),Close Time (HH:MM),Publish Date (YYYY-MM-DD),Publish Time (HH:MM),Option 1,Prob 1 (%),Option 2,Prob 2 (%),...
 
-Will the Bears make the playoffs?,NFL,2026-01-10,12:00,YES,40,NO,60,,,,,,
-Who wins the race?,BIX 7,2026-07-25,08:00,Nick,25,TJ,25,Jake,25,Sam,25,,</div>
+Will the Bears make the playoffs?,NFL,2026-01-10,12:00,,,YES,40,NO,60,,,,,,
+Who wins the race?,BIX 7,2026-07-25,08:00,2026-07-20,09:00,Nick,25,TJ,25,Jake,25,Sam,25,,</div>
   </div>
 
   <!-- ─── FULL MIXED EXAMPLE ───────────────────────────────── -->
   <div class="guide-section">
     <h2>Full mixed file example</h2>
-    <p>Prediction markets and sportsbook bets in one file. The header row is shared.</p>
-    <div class="csv-block">Title,Category,Close Date (YYYY-MM-DD),Close Time (HH:MM),Option 1,Prob 1 (%),Option 2,Prob 2 (%),Option 3,Prob 3 (%),Option 4,Prob 4 (%),Option 5,Prob 5 (%)
-Will it rain on July 4th?,Weather,2026-07-04,06:00,YES,30,NO,70,,,,,,
+    <p>Prediction markets and sportsbook bets in one file. The header row is shared. Prediction rows use cols A–P; sportsbook rows use their own layout starting from col A.</p>
+    <div class="csv-block">Title,Category,Close Date (YYYY-MM-DD),Close Time (HH:MM),Publish Date (YYYY-MM-DD),Publish Time (HH:MM),Option 1,Prob 1 (%),Option 2,Prob 2 (%),...
+Will it rain on July 4th?,Weather,2026-07-04,06:00,,,YES,30,NO,70,,,,,,
+Who wins the race?,BIX 7,2026-07-25,08:00,2026-07-20,09:00,Nick,25,TJ,25,Jake,25,Sam,25,,
 sportsbook,NFL,Bears vs Packers,moneyline,Bears,,<span class="csv-odds-neg">-150</span>,Packers,,<span class="csv-odds-pos">+120</span>,,,
 sportsbook,NFL,Bears vs Packers,spread,Bears,<span class="csv-odds-neg">-3.5</span>,<span class="csv-odds-neg">-110</span>,Packers,<span class="csv-odds-pos">+3.5</span>,<span class="csv-odds-neg">-110</span>,,,
 sportsbook,NFL,Bears vs Packers Total Points,total,,,,,,,<span class="csv-odds-pos">47.5</span>,<span class="csv-odds-neg">-110</span>,<span class="csv-odds-neg">-110</span></div>
@@ -319,6 +322,7 @@ sportsbook,NFL,Bears vs Packers Total Points,total,,,,,,,<span class="csv-odds-p
         <tr><td><code>Sportsbook</code> with capital S</td><td>Must be lowercase: <code>sportsbook</code></td></tr>
         <tr><td>Subtype written as <code>Over/Under</code></td><td>Must be exactly <code>total</code></td></tr>
         <tr><td>Probabilities don't add up to 100</td><td>Prediction market rows are skipped if probs don't sum to 100</td></tr>
+        <tr><td>Options start in col E instead of col G</td><td>New format has Publish Date/Time in cols E–F. Shift options right by 2.</td></tr>
         <tr><td>Missing the header row</td><td>First row must always be the column names</td></tr>
         <tr><td>Total odds entered in the wrong columns</td><td>For totals: Line in col K, Over in col L, Under in col M</td></tr>
       </tbody>
@@ -356,13 +360,13 @@ sportsbook,NFL,Bears vs Packers Total Points,total,,,,,,,<span class="csv-odds-p
     function downloadPMTemplate() {
       const rows = [
         // Header
-        "Title,Category,Close Date (YYYY-MM-DD),Close Time (HH:MM),Option 1,Prob 1 (%),Option 2,Prob 2 (%),Option 3,Prob 3 (%),Option 4,Prob 4 (%),Option 5,Prob 5 (%)",
-        // YES/NO example
-        "Will the Bears make the playoffs?,NFL,2026-01-10,12:00,YES,40,NO,60,,,,,,",
-        // Multi-choice example
-        "Who wins the race?,BIX 7,2026-07-25,08:00,Nick,25,TJ,25,Jake,25,Sam,25,,",
+        "Title,Category,Close Date (YYYY-MM-DD),Close Time (HH:MM),Publish Date (YYYY-MM-DD),Publish Time (HH:MM),Option 1,Prob 1 (%),Option 2,Prob 2 (%),Option 3,Prob 3 (%),Option 4,Prob 4 (%),Option 5,Prob 5 (%)",
+        // YES/NO example — no publish date (goes live immediately)
+        "Will the Bears make the playoffs?,NFL,2026-01-10,12:00,,,YES,40,NO,60,,,,,,",
+        // Multi-choice example with a go-live date
+        "Who wins the race?,BIX 7,2026-07-25,08:00,2026-07-20,09:00,Nick,25,TJ,25,Jake,25,Sam,25,,",
         // 3-option example
-        "Which team finishes first?,NBA,2026-06-01,18:00,Celtics,45,Lakers,30,Warriors,25,,,"
+        "Which team finishes first?,NBA,2026-06-01,18:00,,,Celtics,45,Lakers,30,Warriors,25,,,"
       ];
       triggerDownload(rows.join("\n"), "prediction-market-template.csv");
     }
