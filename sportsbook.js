@@ -213,9 +213,13 @@ function isSbInsiderBlocked(m, userName) {
   );
   const sideTokens = [m.sideA?.label, m.sideB?.label].filter(Boolean)
     .join(" ").toLowerCase().replace(/[^a-z0-9\s]/g, " ").split(/\s+/).filter(t => t.length >= 2);
-  return nameTokens.some(nt =>
-    titleTokens.has(nt) || sideTokens.some(st => st === nt || (st.length >= 3 && nt.startsWith(st)))
+  // Block if your name is literally a side label (any token match)
+  const inSides = nameTokens.some(nt =>
+    sideTokens.some(st => st === nt || (st.length >= 3 && nt.startsWith(st)))
   );
+  // Block if your full name (every token) appears in the title
+  const inTitle = nameTokens.every(nt => titleTokens.has(nt));
+  return inSides || inTitle;
 }
 
 window.sbOpenBet = function(marketId, side) {
@@ -480,26 +484,27 @@ function renderParlaySlip() {
     if (leg.side === null) {
       const m = allSbMarkets[leg.marketId];
       if (!m) return "";
-      let sideButtons = "";
+      const rowId = `parlay-leg-${i}`;
+      let sideButtonsHtml = "";
       if (leg.subtype === "total") {
-        sideButtons = `
-          <button class="parlay-side-pick-btn" onclick="pickLegSide(${i},'over')">Over ${m.line ?? ""} <span class="parlay-pick-odds">${fmtOdds(m.overOdds ?? -110)}</span></button>
-          <button class="parlay-side-pick-btn" onclick="pickLegSide(${i},'under')">Under ${m.line ?? ""} <span class="parlay-pick-odds">${fmtOdds(m.underOdds ?? -110)}</span></button>`;
+        sideButtonsHtml = `
+          <button class="parlay-side-pick-btn" data-leg="${i}" data-side="over">Over ${escHtml(String(m.line ?? ""))} <span class="parlay-pick-odds">${fmtOdds(m.overOdds ?? -110)}</span></button>
+          <button class="parlay-side-pick-btn" data-leg="${i}" data-side="under">Under ${escHtml(String(m.line ?? ""))} <span class="parlay-pick-odds">${fmtOdds(m.underOdds ?? -110)}</span></button>`;
       } else {
         const sA = m.sideA || {}, sB = m.sideB || {};
         const spA = leg.subtype === "spread" && sA.spread ? ` ${sA.spread}` : "";
         const spB = leg.subtype === "spread" && sB.spread ? ` ${sB.spread}` : "";
-        sideButtons = `
-          <button class="parlay-side-pick-btn" onclick="pickLegSide(${i},'A')">${escHtml(sA.label || "Side A")}${spA} <span class="parlay-pick-odds">${fmtOdds(sA.odds ?? -110)}</span></button>
-          <button class="parlay-side-pick-btn" onclick="pickLegSide(${i},'B')">${escHtml(sB.label || "Side B")}${spB} <span class="parlay-pick-odds">${fmtOdds(sB.odds ?? -110)}</span></button>`;
+        sideButtonsHtml = `
+          <button class="parlay-side-pick-btn" data-leg="${i}" data-side="A">${escHtml(sA.label || "Side A")}${spA} <span class="parlay-pick-odds">${fmtOdds(sA.odds ?? -110)}</span></button>
+          <button class="parlay-side-pick-btn" data-leg="${i}" data-side="B">${escHtml(sB.label || "Side B")}${spB} <span class="parlay-pick-odds">${fmtOdds(sB.odds ?? -110)}</span></button>`;
       }
       return `
-        <div class="parlay-leg-row parlay-leg-unpicked">
+        <div class="parlay-leg-row parlay-leg-unpicked" id="${rowId}">
           <div class="parlay-leg-info">
             <div class="parlay-leg-title">${escHtml((leg.marketTitle || "").slice(0, 50))}</div>
-            <div class="parlay-pending-sides">${sideButtons}</div>
+            <div class="parlay-pending-sides">${sideButtonsHtml}</div>
           </div>
-          <button class="parlay-remove-btn" onclick="removeParlayLeg(${i})" title="Remove">&#x2715;</button>
+          <button class="parlay-remove-btn" data-remove="${i}" title="Remove">&#x2715;</button>
         </div>`;
     }
     return `
@@ -512,6 +517,14 @@ function renderParlaySlip() {
         <button class="parlay-remove-btn" onclick="removeParlayLeg(${i})" title="Remove">&#x2715;</button>
       </div>`;
   }).join("");
+
+  // Attach side-pick and remove listeners
+  legsList.querySelectorAll(".parlay-side-pick-btn").forEach(btn => {
+    btn.addEventListener("click", () => pickLegSide(Number(btn.dataset.leg), btn.dataset.side));
+  });
+  legsList.querySelectorAll("[data-remove]").forEach(btn => {
+    btn.addEventListener("click", () => removeParlayLeg(Number(btn.dataset.remove)));
+  });
 
   // Tab multiplier — only when all sides chosen
   const tabOdds = document.getElementById("parlay-slip-odds-display");

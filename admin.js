@@ -245,7 +245,7 @@ window.importCSV = function() {
       const market = { type: "sportsbook", title, category, subtype, status: "open", volume: 0, createdAt: Date.now() };
 
       if (subtype === "total") {
-        const line      = parseFloat(cols[10]) || 0;
+        const line      = (cols[10] || "").trim();
         const overOdds  = parseInt(cols[11]) || -110;
         const underOdds = parseInt(cols[12]) || -110;
         market.line = line; market.overOdds = overOdds; market.underOdds = underOdds;
@@ -1021,6 +1021,34 @@ window.deleteMarket = async function(id) {
   if (!confirm(`Delete "${m.title}"? This cannot be undone.`)) return;
   await remove(ref(db, `markets/${id}`));
   showToast("Market deleted.");
+};
+
+window.deleteAllMarkets = async function() {
+  let entries = Object.entries(allMarkets);
+  if (currentFilter === "open")     entries = entries.filter(([, m]) => m.status === "open" || m.status === "draft");
+  else if (currentFilter === "closed")   entries = entries.filter(([, m]) => m.status === "closed" || m.status === "resolved");
+  else if (currentFilter === "archived") entries = entries.filter(([, m]) => m.status === "archived");
+  // "all" deletes everything except archived
+  else entries = entries.filter(([, m]) => m.status !== "archived");
+
+  if (entries.length === 0) { showToast("No markets to delete."); return; }
+  if (!confirm(`Delete all ${entries.length} ${currentFilter} market${entries.length !== 1 ? "s" : ""}? This cannot be undone.`)) return;
+
+  await Promise.all(entries.map(([id]) => remove(ref(db, `markets/${id}`))));
+  showToast(`Deleted ${entries.length} market${entries.length !== 1 ? "s" : ""}.`);
+};
+
+window.deleteAllSbMarkets = async function() {
+  let entries = Object.entries(allSbMarkets);
+  if (sbAdminFilter === "open")   entries = entries.filter(([, m]) => m.status === "open");
+  else if (sbAdminFilter === "closed") entries = entries.filter(([, m]) => m.status === "closed" || m.status === "resolved");
+  // "all" deletes everything
+
+  if (entries.length === 0) { showToast("No sportsbook markets to delete."); return; }
+  if (!confirm(`Delete all ${entries.length} ${sbAdminFilter} sportsbook market${entries.length !== 1 ? "s" : ""}? This cannot be undone.`)) return;
+
+  await Promise.all(entries.map(([id]) => remove(ref(db, `sb_markets/${id}`))));
+  showToast(`Deleted ${entries.length} sportsbook market${entries.length !== 1 ? "s" : ""}.`);
 };
 
 // ─── EXPORT CSV ──────────────────────────────────────────────

@@ -325,10 +325,14 @@ function isInsiderBlocked(marketTitle, userName, options) {
   const optionTokens = options
     .join(" ").toLowerCase().replace(/[^a-z0-9\s]/g, " ").split(/\s+/).filter(t => t.length >= 2);
   const nameTokens = userName.toLowerCase().replace(/[^a-z0-9\s]/g, " ").split(/\s+/).filter(t => t.length >= 2);
-  return nameTokens.length > 0 && nameTokens.some(nt =>
-    titleTokens.has(nt) ||
+  if (!nameTokens.length) return false;
+  // Block if your name is literally one of the options (any token match)
+  const inOptions = nameTokens.some(nt =>
     optionTokens.some(ot => ot === nt || (ot.length >= 3 && nt.startsWith(ot)))
   );
+  // Block if your full name (every token) appears in the title
+  const inTitle = nameTokens.every(nt => titleTokens.has(nt));
+  return inOptions || inTitle;
 }
 
 function timeAgo(ts) {
