@@ -529,7 +529,7 @@ main {
   color: var(--text-muted);
   margin-top: -0.5rem;
 }
-.market-bet-btns { display: flex; gap: 0.5rem; }
+.market-bet-btns { display: flex; gap: 0.5rem; flex-wrap: wrap; overflow: hidden; }
 
 .bet-btn {
   border: none;
