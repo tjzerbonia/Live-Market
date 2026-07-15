@@ -317,23 +317,6 @@ function escHtml(str) {
 // Insider trading guard — any 2-option market
 // Title words: exact match only
 // Option labels: exact match OR option is a prefix of the username token (e.g. "Nick" → "NickMoney")
-function isInsiderBlocked(marketTitle, userName, options) {
-  if (options.length !== 2 || !userName) return false;
-  const titleTokens = new Set(
-    marketTitle.toLowerCase().replace(/[^a-z0-9\s]/g, " ").split(/\s+/).filter(Boolean)
-  );
-  const optionTokens = options
-    .join(" ").toLowerCase().replace(/[^a-z0-9\s]/g, " ").split(/\s+/).filter(t => t.length >= 2);
-  const nameTokens = userName.toLowerCase().replace(/[^a-z0-9\s]/g, " ").split(/\s+/).filter(t => t.length >= 2);
-  if (!nameTokens.length) return false;
-  // Block if your name is literally one of the options (any token match)
-  const inOptions = nameTokens.some(nt =>
-    optionTokens.some(ot => ot === nt || (ot.length >= 3 && nt.startsWith(ot)))
-  );
-  // Block if your full name (every token) appears in the title
-  const inTitle = nameTokens.every(nt => titleTokens.has(nt));
-  return inOptions || inTitle;
-}
 
 function timeAgo(ts) {
   if (!ts) return "just now";
@@ -869,14 +852,8 @@ function renderMarkets() {
       ? `<div class="market-status-badge closed">Closed</div>`
       : "";
 
-    const blocked = isOpen && user.id && isInsiderBlocked(m.title, user.name, options);
-
     const footerBtns = isOpen
-      ? (blocked
-          ? `<div class="market-bet-btns" onclick="event.stopPropagation()">
-              <div class="bet-restricted-badge">Insider restricted</div>
-            </div>`
-          : (isBinary
+      ? (isBinary
               ? `<div class="market-bet-btns" onclick="event.stopPropagation()">
                   <button class="bet-btn yes" onclick="openBetModal('${id}',0)">YES ${Math.round(probs[0])}¢</button>
                   <button class="bet-btn no"  onclick="openBetModal('${id}',1)">NO ${Math.round(probs[1])}¢</button>
@@ -1025,21 +1002,14 @@ window.openBetModal = function(marketId, optionIndex = 0) {
   updateBetModal();
   subscribeToComments(marketId);
 
-  // Apply insider block AFTER updateBetModal so the restricted message isn't overwritten
-  const blocked       = isOpen && isInsiderBlocked(market.title, user.name, options);
   const tradeControls = document.getElementById("bet-amount-row");
   const submitBtn     = document.getElementById("submit-bet-btn");
-  const summaryEl     = document.getElementById("bet-summary");
   const optionsRowEl  = document.getElementById("bet-options-row");
-  if (tradeControls) tradeControls.style.display = (isOpen && !blocked) ? "" : "none";
-  if (submitBtn)     submitBtn.style.display     = (isOpen && !blocked) ? "" : "none";
-  // Keep options row visible when blocked so avatars still show — just make buttons non-interactive
+  if (tradeControls) tradeControls.style.display = isOpen ? "" : "none";
+  if (submitBtn)     submitBtn.style.display     = isOpen ? "" : "none";
   if (optionsRowEl)  optionsRowEl.style.display  = isOpen ? "" : "none";
-  if (optionsRowEl)  optionsRowEl.style.pointerEvents = blocked ? "none" : "";
-  if (optionsRowEl)  optionsRowEl.style.opacity       = blocked ? "0.6" : "";
-  if (summaryEl && blocked) {
-    summaryEl.innerHTML = `<span class="bet-summary-text bet-summary-closed">You're named in this market — trading restricted.</span>`;
-  }
+  if (optionsRowEl)  optionsRowEl.style.pointerEvents = "";
+  if (optionsRowEl)  optionsRowEl.style.opacity       = "";
 };
 
 function fmtCloseDate(str) {

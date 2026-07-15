@@ -204,23 +204,6 @@ function buildSbCard(id, m) {
 // ─── SINGLE BET MODAL ─────────────────────────────────────────
 let activeSbBet = { marketId: null, side: null, odds: 0 };
 
-function isSbInsiderBlocked(m, userName) {
-  if (!userName) return false;
-  const nameTokens = userName.toLowerCase().replace(/[^a-z0-9\s]/g, " ").split(/\s+/).filter(t => t.length >= 2);
-  if (!nameTokens.length) return false;
-  const titleTokens = new Set(
-    (m.title || "").toLowerCase().replace(/[^a-z0-9\s]/g, " ").split(/\s+/).filter(Boolean)
-  );
-  const sideTokens = [m.sideA?.label, m.sideB?.label].filter(Boolean)
-    .join(" ").toLowerCase().replace(/[^a-z0-9\s]/g, " ").split(/\s+/).filter(t => t.length >= 2);
-  // Block if your name is literally a side label (any token match)
-  const inSides = nameTokens.some(nt =>
-    sideTokens.some(st => st === nt || (st.length >= 3 && nt.startsWith(st)))
-  );
-  // Block if your full name (every token) appears in the title
-  const inTitle = nameTokens.every(nt => titleTokens.has(nt));
-  return inSides || inTitle;
-}
 
 window.sbOpenBet = function(marketId, side) {
   const user = getCurrentUser();
@@ -228,11 +211,6 @@ window.sbOpenBet = function(marketId, side) {
 
   const m = allSbMarkets[marketId];
   if (!m || m.status !== "open") return;
-
-  if (isSbInsiderBlocked(m, user.name)) {
-    showSbToast("You're named in this market — trading restricted.");
-    return;
-  }
 
   activeSbBet.marketId = marketId;
   activeSbBet.side = side;
@@ -389,11 +367,6 @@ window.addToParlay = function(marketId) {
 
   const m = allSbMarkets[marketId];
   if (!m || m.status !== "open") return;
-
-  if (isSbInsiderBlocked(m, user.name)) {
-    showSbToast("You're named in this market — trading restricted.");
-    return;
-  }
 
   if (parlayLegs.find(l => l.marketId === marketId)) {
     showSbToast("Already in your parlay.");
