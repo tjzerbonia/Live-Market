@@ -515,10 +515,19 @@ window.saveMarket = async function() {
 
   // If a future publish date is set, save as draft; otherwise open
   const status = (publishAt && publishAt > Date.now()) ? "draft" : "open";
+  const chartAnchorsRaw = (document.getElementById("f-chartanchors").value || "").trim();
+  const chartAnchors = chartAnchorsRaw
+    ? chartAnchorsRaw.split(",").map(point =>
+        point.trim().split("/").map(v => parseFloat(v.trim())).filter(v => !isNaN(v))
+      ).filter(point => point.length > 0)
+    : null;
+
+  console.log("[admin] chartAnchorsRaw:", chartAnchorsRaw, "chartAnchors:", chartAnchors);
   const data = {
     title, category: category || "General", options, baseProbs, status,
     ...(closeDate ? { closeDate } : {}),
     ...(publishAt ? { publishAt } : {}),
+    ...(chartAnchors && chartAnchors.length >= 2 ? { chartAnchors } : {}),
   };
 
   if (id) {
@@ -564,6 +573,10 @@ window.startEdit = function(id) {
     document.getElementById("f-publishtime").value = "";
   }
 
+  document.getElementById("f-chartanchors").value = m.chartAnchors
+    ? m.chartAnchors.map(point => Array.isArray(point) ? point.join("/") : point).join(", ")
+    : "";
+
   const options   = m.options   || ["YES", "NO"];
   const baseProbs = m.baseProbs || [50, 50];
   const list = document.getElementById("options-list");
@@ -600,6 +613,7 @@ function resetForm() {
   document.getElementById("f-closetime").value = "";
   document.getElementById("f-publishdate").value = "";
   document.getElementById("f-publishtime").value = "";
+  document.getElementById("f-chartanchors").value = "";
 
   document.getElementById("options-list").innerHTML = `
     <div class="option-row" data-index="0">
