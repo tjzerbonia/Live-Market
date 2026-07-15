@@ -525,7 +525,7 @@ function updateParlayPayout() {
 
   const payout = (stake * mult).toFixed(2);
   const profit = (payout - stake).toFixed(2);
-  payEl.innerHTML = `<strong>$${parseFloat(payout).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2})}</strong> payout · +$${parseFloat(profit).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2})} profit · ${mult.toFixed(2)}x`;
+  payEl.innerHTML = `Bet <strong>$${parseFloat(stake).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2})}</strong> → Win <strong>$${parseFloat(profit).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2})}</strong> profit <span style="color:var(--text-dim)">($${parseFloat(payout).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2})} total · ${mult.toFixed(2)}x)</span>`;
 }
 
 window.placeParlayBet = async function() {
