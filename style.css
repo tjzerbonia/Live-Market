@@ -529,7 +529,7 @@ main {
   color: var(--text-muted);
   margin-top: -0.5rem;
 }
-.market-bet-btns { display: grid; grid-template-columns: repeat(auto-fit, minmax(0, 1fr)); gap: 0.4rem; overflow: hidden; }
+.market-bet-btns { display: flex; gap: 0.5rem; }
 
 .bet-btn {
   border: none;
