@@ -449,6 +449,7 @@ function buildDisplayHistory(marketId, market) {
 
   const rawAnchors = toArray(market.chartAnchors);
   const chartAnchors = rawAnchors ? rawAnchors.map(pt => toArray(pt) || pt) : null;
+  console.log("[chart]", marketId, "rawAnchors:", rawAnchors, "chartAnchors:", chartAnchors);
   const seed = seedHistory(marketId, base, current, chartAnchors);
   const real = marketHistories[marketId];
   const expanded = expandRealData(real, base);
