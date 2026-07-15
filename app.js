@@ -447,7 +447,9 @@ function buildDisplayHistory(marketId, market) {
   const total   = base.reduce((s, p) => s + p, 0);
   const normalize = makeNormalize(total);
 
-  const seed = seedHistory(marketId, base, current, market.chartAnchors || null);
+  const rawAnchors = toArray(market.chartAnchors);
+  const chartAnchors = rawAnchors ? rawAnchors.map(pt => toArray(pt) || pt) : null;
+  const seed = seedHistory(marketId, base, current, chartAnchors);
   const real = marketHistories[marketId];
   const expanded = expandRealData(real, base);
 
