@@ -335,7 +335,7 @@ function makeNormalize(total) {
   };
 }
 
-function seedHistory(marketId, baseProbs, currentProbs) {
+function seedHistory(marketId, baseProbs, currentProbs, chartAnchors) {
   let seed = 0;
   for (let i = 0; i < marketId.length; i++) seed += marketId.charCodeAt(i) * (i + 1);
   const rand = () => {
@@ -346,33 +346,47 @@ function seedHistory(marketId, baseProbs, currentProbs) {
   const total = baseProbs.reduce((s, p) => s + p, 0);
   const normalize = makeNormalize(total);
 
-  // Starting state — offset from base so there's somewhere to travel
-  let state = normalize(baseProbs.map(p => Math.max(2, p + (rand() - 0.5) * 22)));
+  let anchors;
 
-  const NUM_ANCHORS = 7;
-  const anchors = [{ t: 0, s: [...state] }];
-
-  for (let a = 1; a < NUM_ANCHORS; a++) {
-    const prevT = anchors[a - 1].t;
-    const gap   = 0.08 + rand() * 0.12;
-    const t     = Math.min(prevT + gap, 0.88);
-
-    if (rand() < 0.35) {
-      const mover = Math.floor(rand() * baseProbs.length);
-      const dir   = rand() > 0.45 ? 1 : -1;
-      const mag   = (rand() * 10 + 12) * dir;
-      const next  = state.map((v, i) => i === mover ? Math.max(2, v + mag) : v);
-      state = normalize(next);
-    } else {
-      // Quiet drift — toward currentProbs so the narrative ends in the right place
-      state = normalize(state.map((v, i) => v + (currentProbs[i] - v) * rand() * 0.07));
+  if (chartAnchors && chartAnchors.length >= 2) {
+    // Admin-defined story: each point is an array of per-option values (slash-separated)
+    anchors = chartAnchors.map((point, idx) => {
+      const t = idx === chartAnchors.length - 1 ? 0.88 : idx / (chartAnchors.length - 1) * 0.88;
+      const pointArr = Array.isArray(point) ? point : [point];
+      // Fill any missing options by distributing remainder proportionally to base weights
+      const specified = pointArr.map(v => Math.max(2, Math.min(98, v)));
+      const specifiedSum = specified.slice(0, baseProbs.length).reduce((s, v) => s + v, 0);
+      const s = baseProbs.map((_, i) => {
+        if (i < specified.length) return specified[i];
+        // unspecified options: distribute leftover proportionally to their base weights
+        const unspecBase = baseProbs.slice(specified.length).reduce((a, b) => a + b, 0) || 1;
+        return (baseProbs[i] / unspecBase) * Math.max(0, 100 - specifiedSum);
+      });
+      return { t, s: normalize(s) };
+    });
+  } else {
+    // Auto random seed
+    let state = normalize(baseProbs.map(p => Math.max(2, p + (rand() - 0.5) * 22)));
+    const NUM_ANCHORS = 7;
+    anchors = [{ t: 0, s: [...state] }];
+    for (let a = 1; a < NUM_ANCHORS; a++) {
+      const prevT = anchors[a - 1].t;
+      const gap   = 0.08 + rand() * 0.12;
+      const t     = Math.min(prevT + gap, 0.88);
+      if (rand() < 0.35) {
+        const mover = Math.floor(rand() * baseProbs.length);
+        const dir   = rand() > 0.45 ? 1 : -1;
+        const mag   = (rand() * 10 + 12) * dir;
+        const next  = state.map((v, i) => i === mover ? Math.max(2, v + mag) : v);
+        state = normalize(next);
+      } else {
+        state = normalize(state.map((v, i) => v + (currentProbs[i] - v) * rand() * 0.07));
+      }
+      anchors.push({ t, s: [...state] });
     }
-
-    anchors.push({ t, s: [...state] });
   }
 
-  // Final anchor is always the actual current probability — the whole trailing
-  // curve converges here so there's no sudden snap at the endpoint.
+  // Final anchor always pins to current probability
   anchors.push({ t: 1.0, s: normalize(currentProbs) });
 
   // ── Expand anchors → 60-point history ─────────────────────────
@@ -433,7 +447,7 @@ function buildDisplayHistory(marketId, market) {
   const total   = base.reduce((s, p) => s + p, 0);
   const normalize = makeNormalize(total);
 
-  const seed = seedHistory(marketId, base, current);
+  const seed = seedHistory(marketId, base, current, market.chartAnchors || null);
   const real = marketHistories[marketId];
   const expanded = expandRealData(real, base);
 
