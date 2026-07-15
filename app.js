@@ -865,10 +865,9 @@ function renderMarkets() {
                   ${options.slice(0, 3).map((opt, i) => {
                     const c = Math.round(probs[i] || 0);
                     const color = OPTION_COLORS[i];
-                    const label = opt.length > 8 ? opt.slice(0, 7) + "…" : opt;
-                    return `<button class="bet-btn multi-opt" style="color:${color};border-color:${color}20;background:${color}12" onclick="openBetModal('${id}',${i})">${label} ${c}¢</button>`;
+                    return `<button class="bet-btn multi-opt" style="--opt-color:${color}" onclick="openBetModal('${id}',${i})"><span class="btn-dot" style="background:${color}"></span>${c}¢</button>`;
                   }).join("")}
-                  ${options.length > 3 ? `<button class="bet-btn trade" onclick="openBetModal('${id}',0)">+${options.length - 3}</button>` : ""}
+                  ${options.length > 3 ? `<button class="bet-btn trade" onclick="openBetModal('${id}',0)">+${options.length - 3} more</button>` : ""}
                 </div>`)
       : `<div class="market-bet-btns"></div>`;
 
@@ -931,10 +930,9 @@ function renderModalChart(history, options, probs, resolvedIndex = -1) {
       </div>`;
     }).join('')}</div>`;
   } else {
-    // Horizontal bar chart — sorted by probability descending
+    // Horizontal bar chart — same order as buttons
     const sorted = options.slice(0, n)
-      .map((opt, i) => ({ opt, i, p: probs[i] || 0 }))
-      .sort((a, b) => b.p - a.p);
+      .map((opt, i) => ({ opt, i, p: probs[i] || 0 }));
     const maxP = Math.max(...sorted.map(s => s.p), 1);
 
     breakdown = `<div class="modal-bar-chart">${sorted.map(({ opt, i, p }) => {
@@ -1044,20 +1042,15 @@ function updateBetOptions() {
   const probs   = getCurrentProbs(activeBet.marketId, market);
   const options = market.options || ["YES", "NO"];
   const isOpen  = market.status === "open";
-  const isHeadToHead = options.length === 2 && !(options[0] === "YES" && options[1] === "NO");
-
   document.getElementById("bet-options-row").innerHTML = options.slice(0, 5).map((opt, i) => {
     const p      = probs[i] || 0;
     const active = i === activeBet.optionIndex ? " active" : "";
     const dim    = p < 5 ? " longshot" : "";
     const color  = OPTION_COLORS[i];
-    const avatar = isHeadToHead
-      ? `<div class="bet-option-avatar" style="background-image:url(${getAvatarForOption(opt)})"></div>`
-      : "";
-    return `<button class="bet-option-btn${active}${dim}${isHeadToHead ? " h2h" : ""}"
+    return `<button class="bet-option-btn${active}${dim}"
       style="--opt-color:${color}"
       ${isOpen ? `onclick="selectOption(${i})"` : "disabled"}>
-      ${avatar}${opt}<br><span class="bet-option-prob">${fmtProb(p)}</span>
+      ${opt}<br><span class="bet-option-prob">${fmtProb(p)}</span>
     </button>`;
   }).join("");
 }
