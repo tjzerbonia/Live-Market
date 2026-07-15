@@ -529,7 +529,8 @@ main {
   color: var(--text-muted);
   margin-top: -0.5rem;
 }
-.market-bet-btns { display: flex; gap: 0.5rem; }
+.market-bet-btns { display: flex; gap: 0.4rem; }
+.bet-btn.multi-opt { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 .bet-btn {
   border: none;

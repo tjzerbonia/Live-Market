@@ -859,7 +859,13 @@ function renderMarkets() {
                   <button class="bet-btn no"  onclick="openBetModal('${id}',1)">NO ${Math.round(probs[1])}¢</button>
                 </div>`
               : `<div class="market-bet-btns" onclick="event.stopPropagation()">
-                  <button class="bet-btn trade" onclick="openBetModal('${id}',0)">${options.length} options — Trade</button>
+                  ${options.slice(0, 3).map((opt, i) => {
+                    const c = Math.round(probs[i] || 0);
+                    const color = OPTION_COLORS[i];
+                    const label = opt.length > 9 ? opt.slice(0, 8) + "…" : opt;
+                    return `<button class="bet-btn multi-opt" style="color:${color};border-color:${color}20;background:${color}12" onclick="openBetModal('${id}',${i})">${label} ${c}¢</button>`;
+                  }).join("")}
+                  ${options.length > 3 ? `<button class="bet-btn trade" onclick="openBetModal('${id}',0)">+${options.length - 3} more</button>` : ""}
                 </div>`)
       : `<div class="market-bet-btns"></div>`;
 
