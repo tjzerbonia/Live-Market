@@ -513,8 +513,8 @@ main {
 /* === Market Footer === */
 .market-footer {
   display: flex;
-  align-items: center;
-  justify-content: space-between;
+  flex-direction: column;
+  gap: 0.5rem;
 }
 .market-vol {
   font-size: 0.75rem;
@@ -529,8 +529,8 @@ main {
   color: var(--text-muted);
   margin-top: -0.5rem;
 }
-.market-bet-btns { display: flex; gap: 0.4rem; }
-.bet-btn.multi-opt { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.market-bet-btns { display: flex; gap: 0.4rem; width: 100%; }
+.bet-btn.multi-opt, .bet-btn.yes, .bet-btn.no, .bet-btn.trade { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 .bet-btn {
   border: none;
