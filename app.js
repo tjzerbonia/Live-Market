@@ -843,7 +843,10 @@ function renderMarkets() {
     const probs   = getCurrentProbs(id, m);
     const history = buildDisplayHistory(id, m);
     const options = m.options || ["YES", "NO"];
-    const isBinary = options.length === 2 && options[0] === "YES" && options[1] === "NO";
+    const isYesNo = options.length === 2 && options.every(o => ["yes","no"].includes(o.toLowerCase()));
+    const isBinary = isYesNo;
+    const yesIdx = isYesNo ? options.findIndex(o => o.toLowerCase() === "yes") : 0;
+    const noIdx  = isYesNo ? options.findIndex(o => o.toLowerCase() === "no")  : 1;
 
     const resolvedIdx = isResolved && m.resolvedOptionIndex != null ? Number(m.resolvedOptionIndex) : -1;
     const chartHTML = renderSparkline(history, options, probs, resolvedIdx);
@@ -855,17 +858,17 @@ function renderMarkets() {
     const footerBtns = isOpen
       ? (isBinary
               ? `<div class="market-bet-btns" onclick="event.stopPropagation()">
-                  <button class="bet-btn yes" onclick="openBetModal('${id}',0)">YES ${Math.round(probs[0])}¢</button>
-                  <button class="bet-btn no"  onclick="openBetModal('${id}',1)">NO ${Math.round(probs[1])}¢</button>
+                  <button class="bet-btn yes" onclick="openBetModal('${id}',${yesIdx})">YES ${Math.round(probs[yesIdx])}¢</button>
+                  <button class="bet-btn no"  onclick="openBetModal('${id}',${noIdx})">NO ${Math.round(probs[noIdx])}¢</button>
                 </div>`
-              : `<div class="market-bet-btns" onclick="event.stopPropagation()">
+              : `<div class="market-bet-btns market-bet-btns-multi" onclick="event.stopPropagation()">
                   ${options.slice(0, 3).map((opt, i) => {
                     const c = Math.round(probs[i] || 0);
                     const color = OPTION_COLORS[i];
-                    const label = opt.length > 9 ? opt.slice(0, 8) + "…" : opt;
+                    const label = opt.length > 8 ? opt.slice(0, 7) + "…" : opt;
                     return `<button class="bet-btn multi-opt" style="color:${color};border-color:${color}20;background:${color}12" onclick="openBetModal('${id}',${i})">${label} ${c}¢</button>`;
                   }).join("")}
-                  ${options.length > 3 ? `<button class="bet-btn trade" onclick="openBetModal('${id}',0)">+${options.length - 3} more</button>` : ""}
+                  ${options.length > 3 ? `<button class="bet-btn trade" onclick="openBetModal('${id}',0)">+${options.length - 3}</button>` : ""}
                 </div>`)
       : `<div class="market-bet-btns"></div>`;
 
