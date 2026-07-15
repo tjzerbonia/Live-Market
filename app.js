@@ -887,7 +887,7 @@ function renderMarkets() {
         <div class="market-footer">
           <div class="market-vol">
             Vol: $${(m.volume || 0).toLocaleString()}
-            ${isOpen && m.closeDate ? `<span class="market-close-time">· Closes ${fmtCloseDate(m.closeDate)}</span>` : ""}
+            ${isOpen && m.closeDate && fmtCloseDate(m.closeDate) ? `<span class="market-close-time">· Closes ${fmtCloseDate(m.closeDate)}</span>` : ""}
           </div>
           ${footerBtns}
         </div>
@@ -974,9 +974,9 @@ window.openBetModal = function(marketId, optionIndex = 0) {
   document.getElementById("bet-modal-market-title").textContent = market.title;
   const closeDateEl = document.getElementById("bet-modal-close-date");
   if (closeDateEl) {
-    const fmt = isOpen && market.closeDate ? `Closes ${fmtCloseDate(market.closeDate)}` : "";
-    closeDateEl.textContent = fmt;
-    closeDateEl.style.display = fmt ? "" : "none";
+    const fmtDate = isOpen ? fmtCloseDate(market.closeDate) : "";
+    closeDateEl.textContent = fmtDate ? `Closes ${fmtDate}` : "";
+    closeDateEl.style.display = fmtDate ? "" : "none";
   }
   const resolvedIdx = market.status === "resolved" && market.resolvedOptionIndex != null ? Number(market.resolvedOptionIndex) : -1;
   document.getElementById("modal-chart-area").innerHTML = renderModalChart(history, options, probs, resolvedIdx);
@@ -1015,9 +1015,9 @@ window.openBetModal = function(marketId, optionIndex = 0) {
 };
 
 function fmtCloseDate(str) {
-  if (!str) return null;
+  if (!str) return "";
   const d = new Date(str);
-  if (isNaN(d)) return null;
+  if (isNaN(d)) return "";
   return d.toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
 }
 
