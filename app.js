@@ -865,7 +865,7 @@ function renderMarkets() {
                     return `<button class="bet-btn multi-opt" style="color:${color};border-color:${color}20;background:${color}12" onclick="openBetModal('${id}',${i})">${opt} ${c}¢</button>`;
                   }).join("")}
                   ${options.length > 3 ? `<button class="bet-btn trade" onclick="openBetModal('${id}',0)">+${options.length - 3} more</button>` : ""}
-                </div>`))
+                </div>`)
       : `<div class="market-bet-btns"></div>`;
 
     return `
