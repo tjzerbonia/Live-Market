@@ -331,11 +331,12 @@ function showCSVPreview(parsed, skipped, sbParsed = [], sbSkipped = []) {
     btn.disabled = true;
     btn.textContent = "Importing...";
 
-    const pmImports = parsed.map(m => push(ref(db, "markets"), {
-      ...m,
-      status: (m.publishAt && m.publishAt > Date.now()) ? "draft" : "open",
-      volume: 0, createdAt: Date.now(),
-    }));
+    const pmImports = parsed.map(m => {
+      const data = { ...m, status: (m.publishAt && m.publishAt > Date.now()) ? "draft" : "open", volume: 0, createdAt: Date.now() };
+      if (!data.closeDate) delete data.closeDate;
+      if (!data.publishAt) delete data.publishAt;
+      return push(ref(db, "markets"), data);
+    });
     const sbImports = sbParsed.map(m => push(ref(db, "sb_markets"), {
       ...m, status: "open", volume: 0, createdAt: Date.now(),
     }));
@@ -515,9 +516,8 @@ window.saveMarket = async function() {
   // If a future publish date is set, save as draft; otherwise open
   const status = (publishAt && publishAt > Date.now()) ? "draft" : "open";
   const data = {
-    title, category: category || "General", options, baseProbs,
-    closeDate: closeDate || null,
-    status,
+    title, category: category || "General", options, baseProbs, status,
+    ...(closeDate ? { closeDate } : {}),
     ...(publishAt ? { publishAt } : {}),
   };
 
