@@ -1566,9 +1566,9 @@ main {
   .bet-modal-market   { font-size: 0.9rem; margin-bottom: 0.5rem; }
 
   /* Option buttons */
-  .bet-options-row { gap: 0.3rem; margin-bottom: 0.6rem; }
-  .bet-option-btn  { padding: 0.5rem 0.3rem; font-size: 0.78rem; min-width: 0; }
-  .bet-option-btn.h2h { padding: 0.6rem 0.5rem; min-width: 80px; }
+  .bet-options-row { gap: 0.3rem; margin-bottom: 0.6rem; display: grid; grid-template-columns: repeat(var(--opt-cols, 3), 1fr); }
+  .bet-option-btn  { padding: 0.5rem 0.3rem; font-size: 0.78rem; min-width: 0; flex: unset; }
+  .bet-option-btn.h2h { padding: 0.6rem 0.5rem; }
   .bet-option-avatar  { width: 40px; height: 40px; }
 
   /* History panel full width bottom sheet */

@@ -1059,7 +1059,10 @@ function updateBetOptions() {
   const probs   = getCurrentProbs(activeBet.marketId, market);
   const options = market.options || ["YES", "NO"];
   const isOpen  = market.status === "open";
-  document.getElementById("bet-options-row").innerHTML = options.slice(0, 5).map((opt, i) => {
+  const optRow = document.getElementById("bet-options-row");
+  const cols = options.length <= 2 ? 2 : options.length <= 4 ? 2 : 3;
+  optRow.style.setProperty("--opt-cols", cols);
+  optRow.innerHTML = options.slice(0, 5).map((opt, i) => {
     const p      = probs[i] || 0;
     const active = i === activeBet.optionIndex ? " active" : "";
     const dim    = p < 5 ? " longshot" : "";
