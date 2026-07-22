@@ -1736,6 +1736,32 @@ window.openPlayerProfile = async function(uid) {
     if (won)       { statusClass = "history-status-won";  statusText = "Won";  cashflow = `<span class="history-cf-win">+$${(bet.payout||0).toLocaleString()}</span>`; }
     else if (lost) { statusClass = "history-status-lost"; statusText = "Lost"; cashflow = `<span class="history-cf-loss">-$${(bet.amount||0).toLocaleString()}</span>`; }
     else           { cashflow = `<span class="history-cf-neutral">-$${(bet.amount||0).toLocaleString()}</span>`; }
+
+    if (bet.isParlay && bet.parlayId) {
+      const parlay = allParlays[bet.parlayId];
+      const legs = parlay?.legs
+        ? (Array.isArray(parlay.legs) ? parlay.legs : Object.values(parlay.legs))
+        : [];
+      const mult = parlay?.combinedMultiplier ? `${parlay.combinedMultiplier.toFixed(2)}x` : "";
+      const legsHtml = legs.map(l => `
+        <div class="parlay-history-leg">
+          <span class="phl-title">${escHtml(l.marketTitle || "")}</span>
+          <span class="phl-side">${escHtml(l.sideLabel || l.side || "")}</span>
+        </div>`).join("");
+      return `
+        <div class="history-row">
+          <div class="history-row-main">
+            <span class="history-status-pill ${statusClass}">${statusText}</span>
+            <div class="history-row-info">
+              <div class="history-row-title">${legs.length || ""}-Leg Parlay ${mult ? `<span class="parlay-mult">${mult}</span>` : ""}</div>
+              <div class="history-row-detail">$${(bet.amount||0).toLocaleString()} bet · $${(bet.payout||0).toLocaleString()} to win · ${timeAgo(bet.timestamp)}</div>
+              ${legsHtml ? `<div class="parlay-history-legs">${legsHtml}</div>` : ""}
+            </div>
+          </div>
+          <div class="history-cf">${cashflow}</div>
+        </div>`;
+    }
+
     return `
       <div class="history-row">
         <div class="history-row-main">
