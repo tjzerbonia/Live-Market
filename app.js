@@ -35,6 +35,8 @@ let allReactions = {};        // { betKey: { emojiKey: { userId: true } } }
 let tradedUserIds = new Set(); // users who have placed at least one bet
 let marketSearch = "";         // search filter string
 let commentUnsubscribe = null; // unsubscribe fn for active comment listener
+let expandedParlays = new Set(); // parlayIds expanded in activity feed
+let cachedParlays = {};          // parlayId -> parlay data (fetched on demand)
 
 // ─── DARK MODE ──────────────────────────────────────────────
 (function applyThemeOnLoad() {
@@ -1277,6 +1279,19 @@ function renderActivityFeed() {
   feed.innerHTML = visible.map(({ key, bet }) => renderActivityItem(key, bet)).join("");
 }
 
+window.toggleParlayExpand = async function(parlayId) {
+  if (expandedParlays.has(parlayId)) {
+    expandedParlays.delete(parlayId);
+  } else {
+    expandedParlays.add(parlayId);
+    if (!cachedParlays[parlayId]) {
+      const snap = await get(ref(db, `parlays/${parlayId}`));
+      cachedParlays[parlayId] = snap.val();
+    }
+  }
+  renderActivityFeed();
+};
+
 function renderActivityItem(key, bet) {
   const label = bet.option || bet.side || "YES";
   const isNo  = label.toUpperCase() === "NO";
@@ -1298,6 +1313,37 @@ function renderActivityItem(key, bet) {
     Object.keys((allReactions[key]?.[rkey]) || {}).length > 0
   );
   const reactionRow = `<div class="activity-reactions${hasAnyReaction ? " has-reactions" : ""}">${reactionBtns}</div>`;
+
+  // Parlay: expandable layout
+  if (bet.isParlay && bet.parlayId) {
+    const isExpanded = expandedParlays.has(bet.parlayId);
+    const parlay = cachedParlays[bet.parlayId];
+    const legCount = bet.option || "parlay";
+    let legsHtml = "";
+    if (isExpanded && parlay && parlay.legs) {
+      const legs = Array.isArray(parlay.legs) ? parlay.legs : Object.values(parlay.legs);
+      legsHtml = `<div class="activity-parlay-legs">${legs.map(l =>
+        `<div class="activity-parlay-leg">
+          <span class="apl-title">${escHtml(l.marketTitle || "")}</span>
+          <span class="apl-side">${escHtml(l.sideLabel || l.side || "")}</span>
+        </div>`).join("")}</div>`;
+    }
+    return `
+    <div class="activity-item activity-parlay">
+      ${avatarEl}
+      <div class="activity-body">
+        <div class="activity-text">
+          <strong>${safeName}</strong> placed a <strong>${escHtml(legCount)}</strong>
+          <button class="parlay-expand-btn" onclick="event.stopPropagation();toggleParlayExpand('${bet.parlayId}')">${isExpanded ? "▲ Hide" : "▼ Legs"}</button>
+        </div>
+        ${legsHtml}
+      </div>
+      <div class="activity-side parlay-badge">${escHtml(legCount)}</div>
+      <div class="activity-amount">$${bet.amount}</div>
+      <div class="activity-time">${timeAgo(bet.timestamp)}</div>
+      ${reactionRow}
+    </div>`;
+  }
 
   return `
   <div class="activity-item">
@@ -1447,9 +1493,36 @@ async function renderHistory() {
       cashflow    = `<span class="history-cf-loss">-$${bet.amount.toLocaleString()}</span>`;
     }
 
-    const title  = escHtml((bet.marketTitle || "Unknown market").slice(0, 50));
     const amount = (bet.amount ?? 0).toLocaleString();
     const payout = (bet.payout ?? 0).toLocaleString();
+
+    // Parlay: show all legs
+    if (bet.isParlay && bet.parlayId) {
+      const parlay = allParlays[bet.parlayId];
+      const legs = parlay?.legs
+        ? (Array.isArray(parlay.legs) ? parlay.legs : Object.values(parlay.legs))
+        : [];
+      const mult = parlay?.combinedMultiplier ? `${parlay.combinedMultiplier.toFixed(2)}x` : "";
+      const legsHtml = legs.map(l => `
+        <div class="parlay-history-leg">
+          <span class="phl-title">${escHtml(l.marketTitle || "")}</span>
+          <span class="phl-side">${escHtml(l.sideLabel || l.side || "")}</span>
+        </div>`).join("");
+      return `
+        <div class="history-row">
+          <div class="history-row-main">
+            <span class="history-status-pill ${statusClass}">${statusText}</span>
+            <div class="history-row-info">
+              <div class="history-row-title">${legs.length || ""}-Leg Parlay ${mult ? `<span class="parlay-mult">${mult}</span>` : ""}</div>
+              <div class="history-row-detail">$${amount} bet · $${payout} to win · ${timeAgo(bet.timestamp)}</div>
+              ${legsHtml ? `<div class="parlay-history-legs">${legsHtml}</div>` : ""}
+            </div>
+          </div>
+          <div class="history-cf">${cashflow}</div>
+        </div>`;
+    }
+
+    const title  = escHtml((bet.marketTitle || "Unknown market").slice(0, 50));
     return `
       <div class="history-row">
         <div class="history-row-main">
