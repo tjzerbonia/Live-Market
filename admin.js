@@ -1047,6 +1047,7 @@ window.showResolveOptions = function(id) {
 window.resolveMarket = async function(id, winningIndex) {
   const m = allMarkets[id];
   if (!m) return;
+  if (m.status === "resolved") { showToast("Market is already resolved."); return; }
   const options = m.options || ["YES", "NO"];
   const winner  = options[winningIndex];
 
@@ -1549,6 +1550,7 @@ window.showSbResolveOptions = function(id) {
 window.resolveSbMarket = async function(id, winningSideKey, winningSideLabel) {
   const m = allSbMarkets[id];
   if (!m) return;
+  if (m.status === "resolved") { showToast("Market is already resolved."); return; }
 
   if (!confirm(`Resolve "${m.title}"\n\nWinner: "${winningSideLabel}"\n\nThis will pay out all winning bets. Cannot be undone.`)) return;
 
