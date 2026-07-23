@@ -7,7 +7,7 @@
 
 import { getApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
 import {
-  getDatabase, ref, onValue, push, update, get, serverTimestamp
+  getDatabase, ref, onValue, push, update, get, serverTimestamp, runTransaction
 } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
 
 const db = getDatabase(getApp());
@@ -280,7 +280,7 @@ window.placeSbBet = async function() {
   const m = allSbMarkets[activeSbBet.marketId];
   if (!m) return;
 
-  // Read current balance from Firebase
+  // Read current balance for validation only
   const balSnap = await get(ref(db, `users/${user.id}/balance`));
   const currentBalance = balSnap.val() ?? user.balance ?? 1000;
 
@@ -295,10 +295,21 @@ window.placeSbBet = async function() {
   const sideLabel = activeSbBet.sideLabel || document.getElementById("sb-bet-side-label").textContent;
   const subtype   = m.subtype || "moneyline";
 
-  const newBalance = currentBalance - amount;
-  await update(ref(db, `users/${user.id}`), { balance: newBalance });
+  // Deduct atomically — prevents overspend if two bets fire concurrently
+  const txResult = await runTransaction(ref(db, `users/${user.id}/balance`), cur => {
+    const bal = cur ?? 1000;
+    if (amount > bal + 1000) return; // abort if over max (return undefined aborts)
+    return bal - amount;
+  });
+  if (!txResult.committed) {
+    showSbToast("Could not place bet — balance check failed.");
+    btn.disabled = false;
+    btn.textContent = "Place Bet";
+    return;
+  }
+  const newBalance = txResult.snapshot.val();
 
-  // Update localStorage balance
+  // Sync localStorage
   try {
     const stored = localStorage.getItem("forecast_user");
     if (stored) {
@@ -540,7 +551,7 @@ window.placeParlayBet = async function() {
   if (!stake || stake < 1) { stakeEl.focus(); showSbToast("Enter a stake amount."); return; }
   const amount = Math.floor(stake);
 
-  // Read balance
+  // Read balance for validation only
   const balSnap = await get(ref(db, `users/${user.id}/balance`));
   const currentBalance = balSnap.val() ?? user.balance ?? 1000;
 
@@ -553,11 +564,22 @@ window.placeParlayBet = async function() {
 
   const multiplier = calcParlayMultiplier();
   const payout     = Math.round(amount * multiplier);
-  const newBalance = currentBalance - amount;
 
-  await update(ref(db, `users/${user.id}`), { balance: newBalance });
+  // Deduct atomically
+  const txResult = await runTransaction(ref(db, `users/${user.id}/balance`), cur => {
+    const bal = cur ?? 1000;
+    if (amount > bal + 1000) return;
+    return bal - amount;
+  });
+  if (!txResult.committed) {
+    showSbToast("Could not place parlay — balance check failed.");
+    btn.disabled = false;
+    btn.textContent = "Place Parlay";
+    return;
+  }
+  const newBalance = txResult.snapshot.val();
 
-  // Update localStorage
+  // Sync localStorage
   try {
     const stored = localStorage.getItem("forecast_user");
     if (stored) {

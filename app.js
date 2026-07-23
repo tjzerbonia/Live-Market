@@ -454,7 +454,6 @@ function buildDisplayHistory(marketId, market) {
 
   const rawAnchors = toArray(market.chartAnchors);
   const chartAnchors = rawAnchors ? rawAnchors.map(pt => toArray(pt) || pt) : null;
-  console.log("[chart]", marketId, "rawAnchors:", rawAnchors, "chartAnchors:", chartAnchors);
   const seed = seedHistory(marketId, base, current, chartAnchors);
   const real = marketHistories[marketId];
   const expanded = expandRealData(real, base);
@@ -1186,10 +1185,15 @@ window.submitBet = async function() {
   const optionLabel = options[activeBet.optionIndex];
   const payout      = Math.round(activeBet.amount / (optionProb / 100));
 
-  user.balance = Math.max(-1000, user.balance - activeBet.amount);
+  // Deduct atomically to prevent overspend from concurrent bets
+  const txResult = await runTransaction(ref(db, `users/${user.id}/balance`), cur => {
+    const bal = cur ?? 1000;
+    return Math.max(-1000, bal - activeBet.amount);
+  });
+  user.balance = txResult.snapshot.val() ?? user.balance;
   localStorage.setItem("forecast_user", JSON.stringify(user));
   updateBalanceDisplay();
-  update(ref(db, `users/${user.id}`), { balance: user.balance, lastSeen: Date.now() });
+  update(ref(db, `users/${user.id}`), { lastSeen: Date.now() });
 
   // Update volume
   await update(ref(db, `markets/${activeBet.marketId}`), {

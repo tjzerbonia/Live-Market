@@ -4,7 +4,7 @@
 
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
 import {
-  getDatabase, ref, push, onValue, update, remove, get
+  getDatabase, ref, push, onValue, update, remove, get, runTransaction
 } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
 import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
 
@@ -522,7 +522,6 @@ window.saveMarket = async function() {
       ).filter(point => point.length > 0)
     : null;
 
-  console.log("[admin] chartAnchorsRaw:", chartAnchorsRaw, "chartAnchors:", chartAnchors);
   const data = {
     title, category: category || "General", options, baseProbs, status,
     ...(closeDate ? { closeDate } : {}),
@@ -796,12 +795,20 @@ async function showPlayerTrades(userId) {
   const row = document.querySelector(`.admin-player-row[data-uid="${userId}"]`);
   if (row) row.after(panel);
 
-  const snap = await get(ref(db, "bets"));
-  const allBets = snap.val() || {};
+  const [betsSnap, sbBetsSnap, parlaysSnap] = await Promise.all([
+    get(ref(db, "bets")),
+    get(ref(db, "sb_bets")),
+    get(ref(db, "parlays")),
+  ]);
+  const allBets    = betsSnap.val()    || {};
+  const allSbBets  = sbBetsSnap.val()  || {};
+  const allParlays = parlaysSnap.val() || {};
 
-  const bets = Object.entries(allBets)
-    .filter(([, b]) => b.userId === userId && b.marketId)
-    .sort(([, a], [, b]) => (b.timestamp || 0) - (a.timestamp || 0));
+  // Combine regular bets + sportsbook bets into one sorted list
+  const bets = [
+    ...Object.entries(allBets).filter(([, b]) => b.userId === userId && b.marketId).map(([k, b]) => [k, b, "bet"]),
+    ...Object.entries(allSbBets).filter(([, b]) => b.userId === userId && b.marketId).map(([k, b]) => [k, b, "sb"]),
+  ].sort(([, a], [, b]) => (b.timestamp || 0) - (a.timestamp || 0));
 
   if (bets.length === 0) {
     panel.innerHTML = `<div class="player-trades-loading">No trades yet.</div>`;
@@ -809,30 +816,51 @@ async function showPlayerTrades(userId) {
   }
 
   panel.innerHTML = "";
-  bets.forEach(([betKey, b]) => {
-    const market = allMarkets[b.marketId];
-    const isResolved = market?.status === "resolved";
-    const won = isResolved && Number(market.resolvedOptionIndex) === Number(b.optionIndex);
-    const lost = isResolved && !won;
+  bets.forEach(([betKey, b, betType]) => {
     const isVoid = !!b.invalidated;
-    const statusClass = isVoid ? "trade-status-void" : won ? "trade-status-won" : lost ? "trade-status-lost" : "trade-status-open";
-    const statusText  = isVoid ? "Void" : won ? "Won" : lost ? "Lost" : "Open";
     const title = (b.marketTitle || "Unknown").slice(0, 35);
+    let statusClass, statusText;
+
+    if (betType === "sb") {
+      const sbMkt = allSbMarkets[b.marketId];
+      const isResolved = sbMkt?.status === "resolved";
+      const won = isResolved && sbMkt.resolvedSide === b.side;
+      statusClass = isVoid ? "trade-status-void" : won ? "trade-status-won" : (isResolved && !won) ? "trade-status-lost" : "trade-status-open";
+      statusText  = isVoid ? "Void" : won ? "Won" : (isResolved && !won) ? "Lost" : "Open";
+    } else if (b.isParlay && b.parlayId) {
+      const parlay = allParlays[b.parlayId];
+      const isResolved = parlay && (parlay.paid || parlay.voided);
+      const won = !!(parlay && parlay.paid && !parlay.voided);
+      statusClass = isVoid ? "trade-status-void" : won ? "trade-status-won" : (isResolved && !won) ? "trade-status-lost" : "trade-status-open";
+      statusText  = isVoid ? "Void" : won ? "Won" : (isResolved && !won) ? "Lost" : "Open";
+    } else {
+      const market = allMarkets[b.marketId];
+      const isResolved = market?.status === "resolved";
+      const won = isResolved && Number(market.resolvedOptionIndex) === Number(b.optionIndex);
+      statusClass = isVoid ? "trade-status-void" : won ? "trade-status-won" : (isResolved && !won) ? "trade-status-lost" : "trade-status-open";
+      statusText  = isVoid ? "Void" : won ? "Won" : (isResolved && !won) ? "Lost" : "Open";
+    }
 
     const tradeEl = document.createElement("div");
     tradeEl.className = "player-trade-row";
     tradeEl.innerHTML = `
       <span class="player-trade-status ${statusClass}">${statusText}</span>
       <span class="player-trade-title">${title}</span>
-      <span class="player-trade-option">${b.option || ""}</span>
+      <span class="player-trade-option">${b.option || b.sideLabel || ""}</span>
       <span class="player-trade-amt">$${(b.amount || 0).toLocaleString()}</span>
-      ${!isVoid ? `<button class="trade-invalidate-btn" data-key="${betKey}" data-amt="${b.amount || 0}" data-uid="${userId}">Void</button>` : ""}
+      ${!isVoid ? `<button class="trade-invalidate-btn" data-key="${betKey}" data-amt="${b.amount || 0}" data-uid="${userId}" data-type="${betType}">Void</button>` : ""}
     `;
     panel.appendChild(tradeEl);
   });
 
   panel.querySelectorAll(".trade-invalidate-btn").forEach(btn => {
-    btn.addEventListener("click", () => invalidateBet(btn.dataset.key, btn.dataset.uid, Number(btn.dataset.amt)));
+    btn.addEventListener("click", () => {
+      if (btn.dataset.type === "sb") {
+        invalidateSbBet(btn.dataset.key, btn.dataset.uid, Number(btn.dataset.amt));
+      } else {
+        invalidateBet(btn.dataset.key, btn.dataset.uid, Number(btn.dataset.amt));
+      }
+    });
   });
 }
 
@@ -933,14 +961,55 @@ window.deleteUser = async function(userId, name) {
 
 
 async function invalidateBet(betKey, userId, amount) {
-  if (!confirm(`Void this bet? The player loses $${amount.toLocaleString()} with no refund.`)) return;
-  await update(ref(db, `bets/${betKey}`), { invalidated: true, invalidatedAt: Date.now() });
-  // Deduct amount from balance since they'd otherwise keep it on resolution
-  const balSnap = await get(ref(db, `users/${userId}/balance`));
-  const cur = balSnap.val() ?? 1000;
-  await update(ref(db, `users/${userId}`), { balance: cur - amount });
-  showToast(`Bet voided. $${amount.toLocaleString()} deducted.`);
-  // Refresh the panel
+  if (!confirm(`Void this bet? The player's $${amount.toLocaleString()} stake is forfeited (already deducted when placed).`)) return;
+
+  const betSnap = await get(ref(db, `bets/${betKey}`));
+  const bet = betSnap.val();
+  if (!bet) { showToast("Bet not found."); return; }
+
+  const updates = { [`bets/${betKey}/invalidated`]: true, [`bets/${betKey}/invalidatedAt`]: Date.now() };
+
+  // If this is a parlay bet, also void the parlay so it can't pay out
+  if (bet.isParlay && bet.parlayId) {
+    updates[`parlays/${bet.parlayId}/voided`] = true;
+  }
+
+  await update(ref(db), updates);
+
+  // If the market already resolved and this bet won, clawback the payout
+  const market = bet.marketId && bet.marketId !== "parlay" ? allMarkets[bet.marketId] : null;
+  if (market && market.status === "resolved" && Number(market.resolvedOptionIndex) === Number(bet.optionIndex)) {
+    const payout = bet.payout || 0;
+    await runTransaction(ref(db, `users/${userId}/balance`), cur => (cur ?? 1000) - payout);
+    showToast(`Bet voided. $${payout.toLocaleString()} payout clawed back.`);
+  } else {
+    showToast(`Bet voided. Stake was already deducted at placement.`);
+  }
+
+  const panel = document.getElementById(`trades-panel-${userId}`);
+  if (panel) panel.remove();
+  showPlayerTrades(userId);
+}
+
+async function invalidateSbBet(betKey, userId, amount) {
+  if (!confirm(`Void this sportsbook bet? The player's $${amount.toLocaleString()} stake is forfeited (already deducted when placed).`)) return;
+
+  const betSnap = await get(ref(db, `sb_bets/${betKey}`));
+  const bet = betSnap.val();
+  if (!bet) { showToast("Bet not found."); return; }
+
+  await update(ref(db, `sb_bets/${betKey}`), { invalidated: true, invalidatedAt: Date.now() });
+
+  // If the market already resolved and this bet won, clawback the payout
+  const sbMkt = allSbMarkets[bet.marketId];
+  if (sbMkt && sbMkt.status === "resolved" && sbMkt.resolvedSide === bet.side) {
+    const payout = bet.payout || 0;
+    await runTransaction(ref(db, `users/${userId}/balance`), cur => (cur ?? 1000) - payout);
+    showToast(`SB bet voided. $${payout.toLocaleString()} payout clawed back.`);
+  } else {
+    showToast(`SB bet voided. Stake was already deducted at placement.`);
+  }
+
   const panel = document.getElementById(`trades-panel-${userId}`);
   if (panel) panel.remove();
   showPlayerTrades(userId);
@@ -999,22 +1068,18 @@ window.resolveMarket = async function(id, winningIndex) {
     payouts[bet.userId] = (payouts[bet.userId] || 0) + (bet.payout || 0);
   });
 
-  const updates = {};
+  // Mark market resolved first
+  await update(ref(db, `markets/${id}`), {
+    status: "resolved",
+    resolvedOption: winner,
+    resolvedOptionIndex: winningIndex,
+    resolvedAt: Date.now(),
+  });
 
-  // Credit each winner's balance in Firebase
-  for (const [userId, payout] of Object.entries(payouts)) {
-    const balSnap = await get(ref(db, `users/${userId}/balance`));
-    const cur     = balSnap.val() ?? 1000;
-    updates[`users/${userId}/balance`] = cur + payout;
-  }
-
-  // Mark market resolved
-  updates[`markets/${id}/status`]              = "resolved";
-  updates[`markets/${id}/resolvedOption`]      = winner;
-  updates[`markets/${id}/resolvedOptionIndex`] = winningIndex;
-  updates[`markets/${id}/resolvedAt`]          = Date.now();
-
-  await update(ref(db), updates);
+  // Credit each winner atomically to prevent concurrent-resolution overwrites
+  await Promise.all(Object.entries(payouts).map(([userId, payout]) =>
+    runTransaction(ref(db, `users/${userId}/balance`), cur => (cur ?? 1000) + payout)
+  ));
 
   const count = Object.keys(payouts).length;
   const total = Object.values(payouts).reduce((s, p) => s + p, 0);
@@ -1542,14 +1607,13 @@ window.resolveSbMarket = async function(id, winningSideKey, winningSideLabel) {
     }
   });
 
-  // Credit winner balances
-  for (const [userId, payout] of Object.entries(payouts)) {
-    const balSnap = await get(ref(db, `users/${userId}/balance`));
-    const cur     = balSnap.val() ?? 1000;
-    updates[`users/${userId}/balance`] = cur + payout;
-  }
-
+  // Apply market + parlay status changes first
   await update(ref(db), updates);
+
+  // Credit winner balances atomically to prevent concurrent-resolution overwrites
+  await Promise.all(Object.entries(payouts).map(([userId, payout]) =>
+    runTransaction(ref(db, `users/${userId}/balance`), cur => (cur ?? 1000) + payout)
+  ));
 
   const count = Object.keys(payouts).length;
   const total = Object.values(payouts).reduce((s, p) => s + p, 0);
