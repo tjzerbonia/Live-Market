@@ -880,14 +880,14 @@ function renderMarkets() {
     const footerBtns = isOpen
       ? (isBinary
               ? `<div class="market-bet-btns" onclick="event.stopPropagation()">
-                  <button class="bet-btn yes" onclick="openBetModal('${id}',${yesIdx})">YES ${Math.round(probs[yesIdx])}¢</button>
-                  <button class="bet-btn no"  onclick="openBetModal('${id}',${noIdx})">NO ${Math.round(probs[noIdx])}¢</button>
+                  <button class="bet-btn yes" onclick="openBetModal('${id}',${yesIdx})">YES ${Math.round(probs[yesIdx])}%</button>
+                  <button class="bet-btn no"  onclick="openBetModal('${id}',${noIdx})">NO ${Math.round(probs[noIdx])}%</button>
                 </div>`
               : `<div class="market-bet-btns market-bet-btns-multi" onclick="event.stopPropagation()">
                   ${options.slice(0, 3).map((opt, i) => {
                     const c = Math.round(probs[i] || 0);
                     const color = OPTION_COLORS[i];
-                    return `<button class="bet-btn multi-opt" style="--opt-color:${color}" onclick="openBetModal('${id}',${i})"><span class="btn-dot" style="background:${color}"></span>${c}¢</button>`;
+                    return `<button class="bet-btn multi-opt" style="--opt-color:${color}" onclick="openBetModal('${id}',${i})"><span class="btn-dot" style="background:${color}"></span>${c}%</button>`;
                   }).join("")}
                   ${options.length > 3 ? `<button class="bet-btn trade" onclick="openBetModal('${id}',0)">+${options.length - 3} more</button>` : ""}
                 </div>`)
