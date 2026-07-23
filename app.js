@@ -201,14 +201,17 @@ function onUserReady() {
     avatarEl.textContent = getInitials(user.name);
   }
   updateBalanceDisplay();
-  registerUserInFirebase();
+  // Wait for Firebase registration (which syncs the true balance) before
+  // starting the balance subscription — prevents phantom win modals on login.
+  registerUserInFirebase().then(() => {
+    subscribeToUserBalance();
+  });
   subscribeToMarkets();
   subscribeToActivity();
   subscribeToUsers();
   subscribeToMarketProbs();
   subscribeToMarketHistories();
   subscribeToConfig();
-  subscribeToUserBalance();
   subscribeToReactions();
 
   // Auto-close markets whose closeDate has passed, and auto-publish scheduled drafts (runs every 60s)
